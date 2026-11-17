@@ -190,7 +190,7 @@ def test_create_exact_expense_rejects_invalid_money_and_members(client):
         ({**payload, "amount": "1.001"}, "INVALID_AMOUNT"),
     ):
         response = client.post("/groups/1/expenses", json=body, headers=headers)
-        assert response.status_code == 400
+        assert response.status_code == 422
         assert response.json()["error"]["code"] == code
 
 
@@ -225,7 +225,7 @@ def test_create_expense_checks_payer_membership_and_group_access(client):
         headers={"X-User": "dan", "Idempotency-Key": "inaccessible"},
     )
 
-    assert payer_response.status_code == 400
+    assert payer_response.status_code == 422
     assert payer_response.json()["error"]["code"] == "INVALID_SPLIT_MEMBER"
     assert inaccessible_response.status_code == 404
     assert inaccessible_response.json()["error"]["code"] == "GROUP_NOT_FOUND"
@@ -350,6 +350,129 @@ def test_failed_share_write_rolls_back_expense_and_allows_retry(client, test_eng
     _delete_expense_by_key(test_engine, "exact-rollback")
 
 
+def test_waiting_matching_request_succeeds_after_first_write_rolls_back(client, test_engine):
+    from concurrent.futures import ThreadPoolExecutor
+    from time import monotonic, sleep
+
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    lock_id = 981337
+    with test_engine.begin() as connection:
+        connection.execute(
+            text("DROP TRIGGER IF EXISTS fail_first_racing_expense_share ON expense_shares")
+        )
+        connection.execute(text("DROP FUNCTION IF EXISTS fail_first_racing_expense_share()"))
+        connection.execute(text("DROP SEQUENCE IF EXISTS expense_share_race_once_seq"))
+        connection.execute(text("CREATE SEQUENCE expense_share_race_once_seq START WITH 1"))
+        connection.execute(
+            text(
+                f"""
+                CREATE FUNCTION fail_first_racing_expense_share() RETURNS trigger
+                LANGUAGE plpgsql AS $$
+                BEGIN
+                    IF nextval('expense_share_race_once_seq') = 1 THEN
+                        PERFORM pg_advisory_xact_lock({lock_id});
+                        RAISE EXCEPTION 'forced first racing share failure';
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TRIGGER fail_first_racing_expense_share
+                BEFORE INSERT ON expense_shares
+                FOR EACH ROW EXECUTE FUNCTION fail_first_racing_expense_share()
+                """
+            )
+        )
+
+    lock_connection = test_engine.connect()
+    lock_connection.execute(text("SELECT pg_advisory_lock(:lock_id)"), {"lock_id": lock_id})
+    lock_connection.commit()
+
+    def wait_for_lock(event: str, timeout: float = 10.0) -> None:
+        deadline = monotonic() + timeout
+        while monotonic() < deadline:
+            with test_engine.connect() as connection:
+                count = connection.scalar(
+                    text(
+                        """
+                        SELECT count(*)
+                        FROM pg_stat_activity
+                        WHERE pid <> pg_backend_pid()
+                          AND datname = current_database()
+                          AND wait_event = :event
+                        """
+                    ),
+                    {"event": event},
+                )
+            if count:
+                return
+            sleep(0.01)
+        raise AssertionError(f"No PostgreSQL session reached wait event {event!r}.")
+
+    payload = {
+        "description": "Racing rollback",
+        "paid_by": "alice",
+        "amount": "10.00",
+        "split": {"type": "exact", "shares": {"bob": "10.00"}},
+    }
+    headers = {"X-User": "alice", "Idempotency-Key": "exact-racing-rollback"}
+    try:
+        with TestClient(app, raise_server_exceptions=False) as race_client:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                first = pool.submit(
+                    race_client.post, "/groups/1/expenses", json=payload, headers=headers
+                )
+                try:
+                    wait_for_lock("advisory")
+                    second = pool.submit(
+                        race_client.post, "/groups/1/expenses", json=payload, headers=headers
+                    )
+                    wait_for_lock("transactionid")
+                finally:
+                    lock_connection.execute(
+                        text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": lock_id}
+                    )
+                    lock_connection.commit()
+                first_response = first.result(timeout=10)
+                second_response = second.result(timeout=10)
+    finally:
+        lock_connection.close()
+        with test_engine.begin() as connection:
+            connection.execute(
+                text("DROP TRIGGER IF EXISTS fail_first_racing_expense_share ON expense_shares")
+            )
+            connection.execute(text("DROP FUNCTION IF EXISTS fail_first_racing_expense_share()"))
+            connection.execute(text("DROP SEQUENCE IF EXISTS expense_share_race_once_seq"))
+
+    assert first_response.status_code == 500
+    assert second_response.status_code == 201
+    with test_engine.begin() as connection:
+        assert connection.execute(
+            text(
+                "SELECT count(*) FROM expenses WHERE idempotency_key = 'exact-racing-rollback'"
+            )
+        ).scalar_one() == 1
+        assert connection.execute(
+            text(
+                """
+                SELECT count(*) FROM expense_shares
+                WHERE expense_id = (
+                    SELECT id FROM expenses WHERE idempotency_key = 'exact-racing-rollback'
+                )
+                """
+            )
+        ).scalar_one() == 1
+    _delete_expense_by_key(test_engine, "exact-racing-rollback")
+
+
 def test_create_expense_requires_money_and_member_values_as_strings(client):
     response = client.post(
         "/groups/1/expenses",
@@ -364,3 +487,20 @@ def test_create_expense_requires_money_and_member_values_as_strings(client):
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_create_expense_rejects_empty_or_whitespace_description(client):
+    payload = {
+        "paid_by": "alice",
+        "amount": "10.00",
+        "split": {"type": "exact", "shares": {"alice": "10.00"}},
+    }
+    for description, key in (("", "empty-description"), ("   ", "blank-description")):
+        response = client.post(
+            "/groups/1/expenses",
+            json={**payload, "description": description},
+            headers={"X-User": "alice", "Idempotency-Key": key},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "VALIDATION_ERROR"
