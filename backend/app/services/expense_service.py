@@ -104,6 +104,7 @@ def create_expense(
                 description=request.description,
                 amount=amount,
                 idempotency_key=idempotency_key,
+                split_type=split_type,
                 request_hash=request_hash,
             )
             if expense_id is not None:
@@ -115,8 +116,6 @@ def create_expense(
                 expense = expense_repository.find_by_idempotency_key(
                     session, group_id, idempotency_key
                 )
-                expense.split_type = split_type
-                session.flush()
                 return _expense_response(expense), 201
 
             expense = expense_repository.find_by_idempotency_key(session, group_id, idempotency_key)

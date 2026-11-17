@@ -35,6 +35,7 @@ def insert_if_absent(
     description: str,
     amount: Decimal,
     idempotency_key: str,
+    split_type: str,
     request_hash: str,
 ) -> str | None:
     from sqlalchemy.dialects.postgresql import insert
@@ -46,7 +47,7 @@ def insert_if_absent(
             paid_by_user_id=paid_by_user_id,
             description=description,
             amount=amount,
-            split_type="exact",
+            split_type=split_type,
             idempotency_key=idempotency_key,
             request_hash=request_hash,
         )
