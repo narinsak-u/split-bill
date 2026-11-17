@@ -90,7 +90,7 @@ describe("group selection", () => {
 
     fireEvent.change(screen.getByLabelText("User"), { target: { value: "bob" } });
     await screen.findByRole("option", { name: "Trip" });
-    expect(screen.queryByText("Dinner")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("Dinner")).not.toBeInTheDocument());
     fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
     expect(await screen.findByText("No expenses recorded for this group.")).toBeInTheDocument();
     expect(screen.queryByText("Dinner")).not.toBeInTheDocument();
@@ -134,7 +134,7 @@ describe("group selection", () => {
     await screen.findByRole("option", { name: "Trip" });
     fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
     fireEvent.click(await screen.findByRole("button", { name: "Delete Dinner" }));
-    expect(screen.getByRole("button", { name: "Deleting…" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "Deleting…" })).toBeDisabled();
     expect(screen.getByText("Dinner")).toBeInTheDocument();
     const deletion = requests.find(({ init }) => init?.method === "DELETE")!;
     expect(deletion.url.endsWith("/groups/1/expenses/7")).toBe(true);
