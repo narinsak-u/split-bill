@@ -26,6 +26,7 @@ def parse_money(value: str, *, allow_zero: bool = False) -> Decimal:
         raise AllocationError("INVALID_AMOUNT")
     return amount.quantize(Decimal("0.01"))
 
+
 def _validate_total(total: Decimal) -> None:
     if (
         not isinstance(total, Decimal)
@@ -35,7 +36,6 @@ def _validate_total(total: Decimal) -> None:
         or total.as_tuple().exponent < -2
     ):
         raise AllocationError("INVALID_AMOUNT")
-
 
 
 def allocate_exact(total: Decimal, shares: Mapping[str, str]) -> list[tuple[str, Decimal]]:
