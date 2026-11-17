@@ -8,6 +8,7 @@ test("only the payer can delete an expense and balances return to their prior st
   await group.selectOption({ label: "Chiang Mai trip" });
   await expect(page.getByRole("heading", { name: "Chiang Mai trip" })).toBeVisible();
 
+  const balances = page.getByRole("list", { name: "Group balances" }).getByRole("listitem");
   await expect(balances).toHaveCount(3);
   const originalBalances = await balances.allTextContents();
   const description = "Payer deletion check";
