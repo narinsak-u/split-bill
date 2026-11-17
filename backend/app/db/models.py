@@ -25,7 +25,11 @@ class Group(Base):
 class GroupMember(Base):
     __tablename__ = "group_members"
 
-    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
     group: Mapped[Group] = relationship(back_populates="memberships")
     user: Mapped[User] = relationship(back_populates="memberships")

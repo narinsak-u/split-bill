@@ -8,7 +8,13 @@ from fastapi.responses import JSONResponse
 from app.api.groups import router as groups_router
 
 app = FastAPI(title="SplitBill API")
-origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",") if origin.strip()]
+origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(
+        ","
+    )
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -32,7 +38,13 @@ async def handle_http_error(_request: Request, exc: HTTPException):
 async def handle_validation_error(_request: Request, exc: RequestValidationError):
     return JSONResponse(
         status_code=422,
-        content={"error": {"code": "VALIDATION_ERROR", "message": "Request validation failed.", "details": exc.errors()}},
+        content={
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Request validation failed.",
+                "details": exc.errors(),
+            }
+        },
     )
 
 
@@ -40,7 +52,13 @@ async def handle_validation_error(_request: Request, exc: RequestValidationError
 async def handle_unexpected_error(_request: Request, _exc: Exception):
     return JSONResponse(
         status_code=500,
-        content={"error": {"code": "INTERNAL_SERVER_ERROR", "message": "An unexpected error occurred.", "details": None}},
+        content={
+            "error": {
+                "code": "INTERNAL_SERVER_ERROR",
+                "message": "An unexpected error occurred.",
+                "details": None,
+            }
+        },
     )
 
 

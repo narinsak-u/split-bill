@@ -2,9 +2,7 @@ def test_user_sees_only_accessible_groups(client):
     response = client.get("/groups", headers={"X-User": "alice"})
 
     assert response.status_code == 200
-    assert response.json() == {
-        "groups": [{"id": 1, "name": "Chiang Mai trip"}]
-    }
+    assert response.json() == {"groups": [{"id": 1, "name": "Chiang Mai trip"}]}
 
 
 def test_office_lunch_is_visible_only_to_its_seeded_members(client):

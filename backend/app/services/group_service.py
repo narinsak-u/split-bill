@@ -16,7 +16,10 @@ def _current_user(session: Session, username: str | None):
 
 def list_groups(session: Session, username: str | None) -> list[dict[str, int | str]]:
     user = _current_user(session, username)
-    return [{"id": group.id, "name": group.name} for group in group_repository.list_for_user(session, user.id)]
+    return [
+        {"id": group.id, "name": group.name}
+        for group in group_repository.list_for_user(session, user.id)
+    ]
 
 
 def get_group(session: Session, username: str | None, group_id: int) -> dict[str, object]:
@@ -28,4 +31,8 @@ def get_group(session: Session, username: str | None, group_id: int) -> dict[str
             detail={"code": "GROUP_NOT_FOUND", "message": "Group not found.", "details": None},
         )
     members = group_repository.list_members(session, group.id)
-    return {"id": group.id, "name": group.name, "members": [{"username": member.username} for member in members]}
+    return {
+        "id": group.id,
+        "name": group.name,
+        "members": [{"username": member.username} for member in members],
+    }
