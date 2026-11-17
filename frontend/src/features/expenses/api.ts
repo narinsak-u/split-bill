@@ -16,7 +16,9 @@ export type CreateExpenseRequest = {
   description: string;
   paid_by: string;
   amount: string;
-  split: { type: "exact"; shares: Record<string, string> };
+  split:
+    | { type: "equal"; members: string[] }
+    | { type: "exact"; shares: Record<string, string> };
 };
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
