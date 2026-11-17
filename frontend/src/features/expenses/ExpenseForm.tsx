@@ -41,7 +41,7 @@ export function ExpenseForm({ username, groupId, members }: { username: string; 
     mode: "onChange",
     defaultValues: { description: "", amount: "", paid_by: members[0] ?? "", splitMembers: [], shares: Object.fromEntries(members.map((member) => [member, ""])) },
   });
-  const { register, handleSubmit, watch, setValue, reset, formState: { errors, isValid, isSubmitting } } = form;
+  const { register, handleSubmit, watch, reset, formState: { errors, isValid, isSubmitting } } = form;
   const amount = watch("amount");
   const splitMembers = watch("splitMembers");
   const shares = watch("shares");
@@ -105,7 +105,7 @@ export function ExpenseForm({ username, groupId, members }: { username: string; 
           {members.map((member) => {
             const checked = splitMembers?.includes(member) ?? false;
             return <div key={member} className="grid gap-2 sm:grid-cols-2 sm:items-center">
-              <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={checked} onChange={(event) => setValue("splitMembers", event.target.checked ? [...(splitMembers ?? []), member] : (splitMembers ?? []).filter((item) => item !== member), { shouldValidate: true, shouldDirty: true })} />{member}</label>
+              <label className="flex min-h-11 items-center gap-2"><input type="checkbox" value={member} {...register("splitMembers")} />{member}</label>
               {checked ? <div>
                 <label htmlFor={`share-${member}`} className="mb-1 block">{member} share</label>
                 <input id={`share-${member}`} inputMode="decimal" {...register(`shares.${member}`)} className="min-h-11 w-full rounded border border-slate-400 px-3" />
