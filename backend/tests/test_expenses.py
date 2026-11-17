@@ -553,7 +553,7 @@ def test_create_equal_expense_stores_ordered_shares_and_canonical_retry(client, 
         created = client.post("/groups/1/expenses", json=payload, headers=headers)
         retry = client.post(
             "/groups/1/expenses",
-            json={**payload, "amount": "0.050"},
+            json={**payload, "amount": "00.05"},
             headers=headers,
         )
         reordered = client.post(
