@@ -115,7 +115,7 @@ export function ExpenseForm({ username, groupId, members }: { username: string; 
           })}
         </div>
         {errors.splitMembers ? <p role="alert">{errors.splitMembers.message}</p> : null}
-        {errors.shares?.message ? <p role="alert">{errors.shares.message}</p> : null}
+        {typeof errors.shares?.message === "string" ? <p role="alert">{errors.shares.message}</p> : null}
       </fieldset>
       <p aria-live="polite">Unallocated: {unallocated === null ? "—" : formatSatang(unallocated)}</p>
       {feedback ? <p role={feedback.kind === "error" ? "alert" : "status"}>{feedback.message}</p> : null}
