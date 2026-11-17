@@ -56,19 +56,21 @@ export function ExpenseForm({ username, groupId, members }: { username: string; 
   const resolver = useMemo(() => zodResolver(schema), [schema]);
   const form = useForm<FormValues>({
     resolver,
-    mode: "onChange",
+    mode: "onSubmit",
     defaultValues: { description: "", amount: "", paid_by: members[0] ?? "", splitType: "exact", splitMembers: [], shares: Object.fromEntries(members.map((member) => [member, ""])) },
   });
-  const { register, handleSubmit, watch, reset, setValue, formState: { errors, isValid, isSubmitting } } = form;
-  const amount = watch("amount");
-  const splitType = watch("splitType");
-  const splitMembers = watch("splitMembers");
-  const shares = watch("shares");
+  const { register, handleSubmit, watch, reset, setValue, trigger, formState: { errors, isValid, isSubmitting } } = form;
+  const values = watch();
+  const amount = values.amount;
+  const splitType = values.splitType;
+  const splitMembers = values.splitMembers;
+  const shares = values.shares;
 
   useEffect(() => watch((values) => {
     if (attempt.current && JSON.stringify(values) !== attempt.current.signature) attempt.current = null;
     setFeedback(null);
-  }).unsubscribe, [watch]);
+    void trigger();
+  }).unsubscribe, [trigger, watch]);
 
   const totalSatang = parseSatang(amount ?? "");
   const allocatedSatang = (splitMembers ?? []).reduce((sum, member) => sum + (parseSatang(shares?.[member] ?? "") ?? 0), 0);
@@ -140,7 +142,7 @@ export function ExpenseForm({ username, groupId, members }: { username: string; 
           {members.map((member) => {
             const checked = splitMembers?.includes(member) ?? false;
             return <div key={member} className="grid gap-2 sm:grid-cols-2 sm:items-center">
-              <label className="flex min-h-11 items-center gap-2"><input type="checkbox" value={member} {...register("splitMembers")} checked={checked} onChange={() => setValue("splitMembers", checked ? (splitMembers ?? []).filter((selected) => selected !== member) : [...(splitMembers ?? []), member], { shouldDirty: true, shouldValidate: true })} />{member}</label>
+              <label className="flex min-h-11 items-center gap-2"><input type="checkbox" value={member} {...register("splitMembers")} checked={checked} onChange={() => setValue("splitMembers", checked ? (splitMembers ?? []).filter((selected) => selected !== member) : [...(splitMembers ?? []), member], { shouldDirty: true })} />{member}</label>
               {checked && splitType === "exact" ? <div>
                 <label htmlFor={`share-${member}`} className="mb-1 block">{member} share</label>
                 <input id={`share-${member}`} inputMode="decimal" {...register(`shares.${member}`)} className="min-h-11 w-full rounded border border-slate-400 px-3" />
