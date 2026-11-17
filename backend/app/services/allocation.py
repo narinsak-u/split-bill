@@ -26,8 +26,7 @@ def parse_money(value: str, *, allow_zero: bool = False) -> Decimal:
         raise AllocationError("INVALID_AMOUNT")
     return amount.quantize(Decimal("0.01"))
 
-
-def allocate_exact(total: Decimal, shares: Mapping[str, str]) -> list[tuple[str, Decimal]]:
+def _validate_total(total: Decimal) -> None:
     if (
         not isinstance(total, Decimal)
         or not total.is_finite()
@@ -36,6 +35,11 @@ def allocate_exact(total: Decimal, shares: Mapping[str, str]) -> list[tuple[str,
         or total.as_tuple().exponent < -2
     ):
         raise AllocationError("INVALID_AMOUNT")
+
+
+
+def allocate_exact(total: Decimal, shares: Mapping[str, str]) -> list[tuple[str, Decimal]]:
+    _validate_total(total)
     if not shares:
         raise AllocationError(
             "INVALID_SPLIT_TOTAL", {"expected": format(total, ".2f"), "actual": "0.00"}
@@ -59,14 +63,7 @@ def allocate_exact(total: Decimal, shares: Mapping[str, str]) -> list[tuple[str,
 
 
 def allocate_equal(total: Decimal, members: list[str]) -> list[tuple[str, Decimal]]:
-    if (
-        not isinstance(total, Decimal)
-        or not total.is_finite()
-        or total <= 0
-        or total > _MAX_AMOUNT
-        or total.as_tuple().exponent < -2
-    ):
-        raise AllocationError("INVALID_AMOUNT")
+    _validate_total(total)
     if not members:
         raise AllocationError("INVALID_SPLIT_MEMBER", {"members": []})
     if any(not isinstance(member, str) or not member for member in members):

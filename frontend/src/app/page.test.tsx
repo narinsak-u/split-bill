@@ -67,8 +67,8 @@ describe("group selection", () => {
       if (url.endsWith("/groups/1")) return { ok: true, json: async () => ({ id: 1, name: "Trip", members: [{ username: "alice" }, { username: "bob" }] }) } as Response;
       if (url.endsWith("/groups/1/expenses")) {
         return { ok: true, json: async () => user === "alice" ? ({ expenses: [{
-          id: 7, group_id: 1, description: "Dinner", paid_by: "alice", amount: "30.00",
-          split: { type: "exact", shares: [{ username: "bob", amount: "12.34" }, { username: "alice", amount: "17.66" }] },
+          id: 7, group_id: 1, description: "Dinner", paid_by: "alice", amount: "1000.00",
+          split: { type: "exact", shares: [{ username: "bob", amount: "1000.00" }, { username: "alice", amount: "0.00" }] },
           created_at: "2025-02-03T12:30:00Z", deleted_at: null,
         }] }) : ({ expenses: [] }) } as Response;
       }
@@ -81,9 +81,9 @@ describe("group selection", () => {
     fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
     expect(await screen.findByText("Dinner")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete Dinner" })).toBeInTheDocument();
-    expect(screen.getByText("30.00")).toBeInTheDocument();
-    expect(screen.getByText("bob: 12.34")).toBeInTheDocument();
-    expect(screen.getByText("alice: 17.66")).toBeInTheDocument();
+    expect(screen.getByText("1,000.00")).toBeInTheDocument();
+    expect(screen.getByText("bob: 1,000.00")).toBeInTheDocument();
+    expect(screen.getByText("alice: 0.00")).toBeInTheDocument();
     expect(within(screen.getByRole("article", { name: "Expense: Dinner" })).getByText(/exact/i)).toBeInTheDocument();
     expect(screen.getByText(/\b2025\b/)).toBeInTheDocument();
     expect(requests).toContainEqual({ url: expect.stringMatching(/\/groups\/1\/expenses$/), user: "alice" });
@@ -243,17 +243,20 @@ describe("group selection", () => {
     fireEvent.change(screen.getByLabelText("Group"), { target: { value: "2" } });
     expect(await screen.findByText("Lunch", { selector: "h3" })).toBeInTheDocument();
   });
-  it("shows every member with signed, grouped balances", async () => {
+  it("renders balances aggregated from two maximum-size expenses", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/groups")) return { ok: true, json: async () => ({ groups: [{ id: 1, name: "Trip" }] }) } as Response;
       if (url.endsWith("/groups/1")) return { ok: true, json: async () => ({ id: 1, name: "Trip", members: [{ username: "alice" }, { username: "bob" }, { username: "carol" }] }) } as Response;
-      if (url.endsWith("/groups/1/expenses")) return { ok: true, json: async () => ({ expenses: [] }) } as Response;
+      if (url.endsWith("/groups/1/expenses")) return { ok: true, json: async () => ({ expenses: [
+        { id: 1, group_id: 1, description: "First", paid_by: "alice", amount: "9999999999.99", split: { type: "exact", shares: [{ username: "bob", amount: "9999999999.99" }] }, created_at: "2025-02-03T12:30:00Z", deleted_at: null },
+        { id: 2, group_id: 1, description: "Second", paid_by: "alice", amount: "9999999999.99", split: { type: "exact", shares: [{ username: "bob", amount: "9999999999.99" }] }, created_at: "2025-02-02T12:30:00Z", deleted_at: null },
+      ] }) } as Response;
       if (url.endsWith("/groups/1/balances")) return { ok: true, json: async () => ({
         group_id: 1,
         balances: [
-          { username: "alice", paid: "1234.56", share: "0.00", balance: "1234.56" },
-          { username: "bob", paid: "0.00", share: "1234.56", balance: "-1234.56" },
+          { username: "alice", paid: "19999999999.98", share: "0.00", balance: "19999999999.98" },
+          { username: "bob", paid: "0.00", share: "19999999999.98", balance: "-19999999999.98" },
         ],
         total_balance: "0.00",
       }) } as Response;
@@ -265,10 +268,10 @@ describe("group selection", () => {
     fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
 
     expect(await screen.findByRole("list", { name: "Group balances" })).toBeInTheDocument();
-    expect(screen.getByRole("listitem", { name: "alice balance: owed 1,234.56" })).toHaveTextContent("+1,234.56");
-    expect(screen.getByText("Paid: 1,234.56 · Share: 0.00")).toBeInTheDocument();
-    expect(screen.getByText("Paid: 0.00 · Share: 1,234.56")).toBeInTheDocument();
-    expect(screen.getByRole("listitem", { name: "bob balance: owes 1,234.56" })).toHaveTextContent("-1,234.56");
+    expect(screen.getByRole("listitem", { name: "alice balance: owed 19,999,999,999.98" })).toHaveTextContent("+19,999,999,999.98");
+    expect(screen.getByText("Paid: 19,999,999,999.98 · Share: 0.00")).toBeInTheDocument();
+    expect(screen.getByText("Paid: 0.00 · Share: 19,999,999,999.98")).toBeInTheDocument();
+    expect(screen.getByRole("listitem", { name: "bob balance: owes 19,999,999,999.98" })).toHaveTextContent("-19,999,999,999.98");
     expect(screen.getByRole("listitem", { name: "carol balance: settled 0.00" })).toHaveTextContent("Settled");
   });
 

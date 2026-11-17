@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatSatang, parseSatang } from "./money";
+import { formatMoney, formatSatang, parseSatang } from "./money";
 
 describe("parseSatang", () => {
   it.each([
@@ -37,5 +37,15 @@ describe("formatSatang", () => {
   });
   it.each([1.5, Number.MAX_SAFE_INTEGER + 1])("rejects unsafe satang value %s", (satang) => {
     expect(() => formatSatang(satang)).toThrow(RangeError);
+  });
+});
+
+describe("formatMoney", () => {
+  it.each([
+    ["1000.00", "1,000.00"],
+    ["19999999999.98", "19,999,999,999.98"],
+    ["-19999999999.98", "-19,999,999,999.98"],
+  ])("formats %s as %s", (value, expected) => {
+    expect(formatMoney(value)).toBe(expected);
   });
 });

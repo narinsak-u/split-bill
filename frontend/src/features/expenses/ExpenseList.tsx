@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteExpense, type Expense } from "./api";
+import { formatMoney } from "../../lib/money";
 
 export function ExpenseList({ expenses, username, groupId }: { expenses: Expense[]; username: string; groupId: number }) {
   const queryClient = useQueryClient();
@@ -35,7 +36,7 @@ export function ExpenseList({ expenses, username, groupId }: { expenses: Expense
                 </div>
                 <div>
                   <dt className="font-medium">Amount</dt>
-                  <dd>{expense.amount}</dd>
+                  <dd>{formatMoney(expense.amount)}</dd>
                 </div>
                 <div>
                   <dt className="font-medium">Date</dt>
@@ -49,7 +50,7 @@ export function ExpenseList({ expenses, username, groupId }: { expenses: Expense
               <h4 className="mt-3 font-medium">Shares</h4>
               <ul aria-label={`Shares for ${expense.description}`} className="mt-1">
                 {expense.split.shares.map((share) => (
-                  <li key={share.username}>{share.username}: {share.amount}</li>
+                  <li key={share.username}>{share.username}: {formatMoney(share.amount)}</li>
                 ))}
               </ul>
               {expense.paid_by === username ? (

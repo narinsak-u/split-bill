@@ -6,7 +6,7 @@ import { getGroup, getGroups } from "../features/groups/api";
 import { getBalances, getExpenses } from "../features/expenses/api";
 import { ExpenseForm } from "../features/expenses/ExpenseForm";
 import { ExpenseList } from "../features/expenses/ExpenseList";
-import { formatSatang, parseSatang } from "../lib/money";
+import { formatMoney } from "../lib/money";
 
 const users = ["alice", "bob", "carol", "dan"];
 
@@ -81,12 +81,14 @@ export default function SplitBillPage() {
           <ul aria-label="Group balances" className="mt-4 divide-y divide-slate-200">
             {detail.data.members.map((member) => {
               const balance = balances.data.balances.find((entry) => entry.username === member.username);
-              const paid = formatBalanceAmount(balance?.paid ?? "0.00");
-              const share = formatBalanceAmount(balance?.share ?? "0.00");
-              const satang = parseBalanceAmount(balance?.balance ?? "0.00");
-              const status = satang > 0 ? "owed" : satang < 0 ? "owes" : "settled";
-              const amount = formatSatang(Math.abs(satang));
-              const signedAmount = satang > 0 ? `+${amount}` : satang < 0 ? `-${amount}` : amount;
+              const paid = formatMoney(balance?.paid ?? "0.00");
+              const share = formatMoney(balance?.share ?? "0.00");
+              const balanceValue = balance?.balance ?? "0.00";
+              const isZero = /^-?0+\.00$/.test(balanceValue);
+              const isNegative = balanceValue.startsWith("-");
+              const status = isZero ? "settled" : isNegative ? "owes" : "owed";
+              const amount = formatMoney(isNegative ? balanceValue.slice(1) : balanceValue);
+              const signedAmount = isZero ? amount : `${isNegative ? "-" : "+"}${amount}`;
               return (
                 <li key={member.username} aria-label={`${member.username} balance: ${status} ${amount}`} className="flex flex-wrap justify-between gap-2 py-3">
                   <span className="font-medium">{member.username}</span>
@@ -104,13 +106,4 @@ export default function SplitBillPage() {
     </main>
   );
 }
-function parseBalanceAmount(value: string): number {
-  const negative = value.startsWith("-");
-  const satang = parseSatang(negative ? value.slice(1) : value);
-  if (satang === null) throw new Error("Invalid balance amount.");
-  return negative ? -satang : satang;
-}
 
-function formatBalanceAmount(value: string): string {
-  return formatSatang(parseBalanceAmount(value));
-}
