@@ -22,25 +22,39 @@ describe("group selection", () => {
       const url = String(input);
       const user = (init?.headers as Record<string, string>)["X-User"];
       if (url.endsWith("/groups/1")) {
-        return { ok: true, json: async () => ({ id: 1, name: "Chiang Mai trip", members: [{ username: "alice" }, { username: "bob" }] }) } as Response;
+        return { ok: true, json: async () => ({ id: 1, name: "Chiang Mai trip", members: [{ username: "alice" }, { username: "bob" }, { username: "carol" }] }) } as Response;
       }
       if (url.endsWith("/groups")) {
-        return { ok: true, json: async () => ({ groups: user === "alice" ? [{ id: 1, name: "Chiang Mai trip" }] : [{ id: 2, name: "Office lunch" }] }) } as Response;
+        const groups = {
+          alice: [{ id: 1, name: "Chiang Mai trip" }],
+          bob: [{ id: 1, name: "Chiang Mai trip" }, { id: 2, name: "Office lunch" }],
+          dan: [{ id: 2, name: "Office lunch" }],
+        };
+        return { ok: true, json: async () => ({ groups: groups[user as keyof typeof groups] ?? [] }) } as Response;
       }
       throw new Error(`Unexpected request: ${url}`);
     }));
 
     renderPage();
     await screen.findByRole("option", { name: "Chiang Mai trip" });
+    expect(screen.queryByRole("option", { name: "Office lunch" })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
-    expect(await screen.findByText("alice, bob")).toBeInTheDocument();
+    expect(await screen.findByText("alice, bob, carol")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("User"), { target: { value: "bob" } });
     await screen.findByRole("option", { name: "Office lunch" });
-
-    expect(screen.queryByText("alice, bob")).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Chiang Mai trip" })).toBeInTheDocument();
     expect(screen.getByLabelText("Group")).toHaveValue("");
+    expect(screen.queryByText("alice, bob, carol")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
+    expect(await screen.findByText("alice, bob, carol")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("User"), { target: { value: "dan" } });
+    await screen.findByRole("option", { name: "Office lunch" });
+
     expect(screen.queryByRole("option", { name: "Chiang Mai trip" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Group")).toHaveValue("");
+    expect(screen.queryByText("alice, bob, carol")).not.toBeInTheDocument();
   });
 
   it("shows empty groups and API failures", async () => {
