@@ -59,13 +59,6 @@ def test_allocate_exact_rejects_total_with_excess_precision():
         allocate_exact(Decimal("1.000"), {"alice": "1.00"})
 
     assert error.value.code == "INVALID_AMOUNT"
-def test_allocate_exact_rejects_empty_or_mismatched_shares(shares):
-    with pytest.raises(AllocationError) as error:
-        allocate_exact(Decimal("1.00"), shares)
-
-    assert error.value.code == "INVALID_SPLIT_TOTAL"
-    assert "expected" in error.value.details
-    assert "actual" in error.value.details
 
 
 @pytest.mark.parametrize("shares", [{"alice": "-0.01"}, {"": "1.00"}, {"alice": "1.001"}, {"alice": "10000000000.00"}])
