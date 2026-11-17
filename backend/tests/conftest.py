@@ -16,13 +16,21 @@ from app.scripts.seed import seed_database
 
 @pytest.fixture(scope="session")
 def test_engine():
-    database_url = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL")
+    database_url = os.environ.get("TEST_DATABASE_URL")
     if not database_url:
-        pytest.fail("Set TEST_DATABASE_URL to a PostgreSQL 16 database")
+        pytest.fail("Set TEST_DATABASE_URL to a PostgreSQL 16 test database; DATABASE_URL is not used.")
     engine = create_engine(database_url)
     config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
     config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
-    command.upgrade(config, "head")
+    application_database_url = os.environ.get("DATABASE_URL")
+    os.environ["DATABASE_URL"] = database_url
+    try:
+        command.upgrade(config, "head")
+    finally:
+        if application_database_url is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = application_database_url
     with Session(engine) as session:
         seed_database(session)
     yield engine
