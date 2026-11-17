@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import SplitBillPage from "./page";
 import { QueryProvider } from "./providers";
 
@@ -81,7 +81,7 @@ describe("group selection", () => {
     expect(screen.getByText("30.00")).toBeInTheDocument();
     expect(screen.getByText("bob: 12.34")).toBeInTheDocument();
     expect(screen.getByText("alice: 17.66")).toBeInTheDocument();
-    expect(screen.getByText(/exact/i)).toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "Expense: Dinner" })).getByText(/exact/i)).toBeInTheDocument();
     expect(screen.getByText(/\b2025\b/)).toBeInTheDocument();
     expect(requests).toContainEqual({ url: expect.stringMatching(/\/groups\/1\/expenses$/), user: "alice" });
 
@@ -180,7 +180,6 @@ describe("exact expense recording", () => {
       if (url.endsWith("/groups/1")) return { ok: true, json: async () => ({ id: 1, name: "Trip", members: [{ username: "alice" }, { username: "bob" }] }) } as Response;
       if (url.endsWith("/groups/1/expenses") && init?.method === "POST") return onCreate(init);
       if (url.endsWith("/groups/1/expenses")) return { ok: true, json: async () => ({ expenses: [] }) } as Response;
-      if (url.endsWith("/groups/1/balances")) return { ok: true, json: async () => ({ group_id: 1, balances: [], total_balance: "0.00" }) } as Response;
       throw new Error(`Unexpected request: ${url}`);
     }));
     return requests;
@@ -210,7 +209,7 @@ describe("exact expense recording", () => {
     fireEvent.change(screen.getByLabelText("alice share"), { target: { value: "0" } });
     fireEvent.change(screen.getByLabelText("bob share"), { target: { value: "10.00" } });
     expect(screen.getByText("Unallocated: 0.00")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Record expense" })).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Record expense" })).toBeEnabled());
   });
 
   it("reuses a key for unchanged retries, then creates a new key after editing", async () => {
@@ -218,9 +217,11 @@ describe("exact expense recording", () => {
     await showForm();
     enterValidExpense();
     fireEvent.change(screen.getByLabelText("alice share"), { target: { value: "10.00" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Record expense" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Record expense" }));
     expect(await screen.findByText("Try again.")).toBeInTheDocument();
     const firstKey = (requests.find((request) => request.init?.method === "POST")?.init?.headers as Record<string, string>)["Idempotency-Key"];
+    await waitFor(() => expect(screen.getByRole("button", { name: "Record expense" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Record expense" }));
     await waitFor(() => expect(requests.filter((request) => request.init?.method === "POST")).toHaveLength(2));
     const postRequests = requests.filter((request) => request.init?.method === "POST");
@@ -228,6 +229,7 @@ describe("exact expense recording", () => {
     expect(screen.getByLabelText("Description")).toHaveValue("Dinner");
 
     fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Lunch" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Record expense" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Record expense" }));
     await waitFor(() => expect(requests.filter((request) => request.init?.method === "POST")).toHaveLength(3));
     const changedKey = (requests.filter((request) => request.init?.method === "POST")[2].init?.headers as Record<string, string>)["Idempotency-Key"];
@@ -239,6 +241,7 @@ describe("exact expense recording", () => {
     await showForm();
     enterValidExpense();
     fireEvent.change(screen.getByLabelText("alice share"), { target: { value: "10.00" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Record expense" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Record expense" }));
     expect(await screen.findByText("Expense recorded.")).toBeInTheDocument();
     const post = requests.find((request) => request.init?.method === "POST")!;
@@ -247,7 +250,6 @@ describe("exact expense recording", () => {
     expect((post.init?.headers as Record<string, string>)["Idempotency-Key"]).toBeTruthy();
     await waitFor(() => {
       expect(requests.filter((request) => request.url.endsWith("/groups/1/expenses") && !request.init?.method)).toHaveLength(2);
-      expect(requests.some((request) => request.url.endsWith("/groups/1/balances"))).toBe(true);
     });
   });
 
@@ -256,6 +258,7 @@ describe("exact expense recording", () => {
     await showForm();
     enterValidExpense();
     fireEvent.change(screen.getByLabelText("alice share"), { target: { value: "10.00" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Record expense" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Record expense" }));
     expect(await screen.findByText("This key was used for another expense.")).toBeInTheDocument();
     expect(screen.getByLabelText("Description")).toHaveValue("Dinner");
@@ -266,8 +269,10 @@ describe("exact expense recording", () => {
     await showForm();
     enterValidExpense();
     fireEvent.change(screen.getByLabelText("alice share"), { target: { value: "10.00" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Record expense" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Record expense" }));
     expect(await screen.findByText("offline")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Record expense" })).toBeEnabled());
     expect(screen.getByLabelText("Description")).toHaveValue("Dinner");
     fireEvent.click(screen.getByRole("button", { name: "Record expense" }));
     await waitFor(() => expect(requests.filter((request) => request.init?.method === "POST")).toHaveLength(2));
