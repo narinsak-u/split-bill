@@ -51,6 +51,8 @@ export function ExpenseForm({ username, groupId, members }: { username: string; 
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const attempt = useRef<Attempt | null>(null);
+  const [orderedSplitMembers, setOrderedSplitMembers] = useState<string[]>([]);
+  const resetSignature = useRef<string | null>(null);
   const membersSignature = JSON.stringify(members);
   const schema = useMemo(() => createFormSchema(JSON.parse(membersSignature) as string[]), [membersSignature]);
   const resolver = useMemo(() => zodResolver(schema), [schema]);
@@ -67,7 +69,13 @@ export function ExpenseForm({ username, groupId, members }: { username: string; 
   const shares = values.shares;
 
   useEffect(() => watch((values) => {
-    if (attempt.current && JSON.stringify(values) !== attempt.current.signature) attempt.current = null;
+    const signature = JSON.stringify(values);
+    if (resetSignature.current === signature) {
+      resetSignature.current = null;
+      return;
+    }
+    resetSignature.current = null;
+    if (attempt.current && signature !== attempt.current.signature) attempt.current = null;
     setFeedback(null);
     void trigger();
   }).unsubscribe, [trigger, watch]);
@@ -75,10 +83,10 @@ export function ExpenseForm({ username, groupId, members }: { username: string; 
   const totalSatang = parseSatang(amount ?? "");
   const allocatedSatang = (splitMembers ?? []).reduce((sum, member) => sum + (parseSatang(shares?.[member] ?? "") ?? 0), 0);
   const unallocated = totalSatang === null ? null : totalSatang - allocatedSatang;
-  const equalPreview = totalSatang !== null && splitMembers?.length
-    ? splitMembers.map((member, index) => ({
+  const equalPreview = totalSatang !== null && orderedSplitMembers.length
+    ? orderedSplitMembers.map((member, index) => ({
         member,
-        satang: Math.floor(totalSatang / splitMembers.length) + (index < totalSatang % splitMembers.length ? 1 : 0),
+        satang: Math.floor(totalSatang / orderedSplitMembers.length) + (index < totalSatang % orderedSplitMembers.length ? 1 : 0),
       }))
     : [];
 
@@ -88,17 +96,21 @@ export function ExpenseForm({ username, groupId, members }: { username: string; 
       paid_by: values.paid_by,
       amount: values.amount,
       split: values.splitType === "equal"
-        ? { type: "equal" as const, members: [...values.splitMembers] }
-        : { type: "exact" as const, shares: Object.fromEntries(values.splitMembers.map((member) => [member, values.shares[member]])) },
+        ? { type: "equal" as const, members: [...orderedSplitMembers] }
+        : { type: "exact" as const, shares: Object.fromEntries(orderedSplitMembers.map((member) => [member, values.shares[member]])) },
     };
-    const signature = JSON.stringify(values);
+    const signature = JSON.stringify({ ...values, splitMembers: orderedSplitMembers });
     if (!attempt.current || attempt.current.signature !== signature) attempt.current = { signature, key: crypto.randomUUID() };
     setFeedback(null);
     try {
       await createExpense(username, groupId, attempt.current.key, payload);
       attempt.current = null;
-      reset({ description: "", amount: "", paid_by: members[0] ?? "", splitType: "exact", splitMembers: [], shares: Object.fromEntries(members.map((member) => [member, ""])) });
+      const clearedValues = { description: "", amount: "", paid_by: members[0] ?? "", splitType: "exact" as const, splitMembers: [], shares: Object.fromEntries(members.map((member) => [member, ""])) };
+      resetSignature.current = JSON.stringify(clearedValues);
+      reset(clearedValues);
+      setOrderedSplitMembers([]);
       setFeedback({ kind: "success", message: "Expense recorded." });
+      
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["expenses", username, String(groupId)] }),
         queryClient.invalidateQueries({ queryKey: ["balances", username, String(groupId)] }),
@@ -140,9 +152,13 @@ export function ExpenseForm({ username, groupId, members }: { username: string; 
         <legend className="font-medium">Split members{splitType === "exact" ? " and exact shares" : ""}</legend>
         <div className="mt-2 space-y-3">
           {members.map((member) => {
-            const checked = splitMembers?.includes(member) ?? false;
+            const checked = orderedSplitMembers.includes(member);
             return <div key={member} className="grid gap-2 sm:grid-cols-2 sm:items-center">
-              <label className="flex min-h-11 items-center gap-2"><input type="checkbox" value={member} {...register("splitMembers")} checked={checked} onChange={() => setValue("splitMembers", checked ? (splitMembers ?? []).filter((selected) => selected !== member) : [...(splitMembers ?? []), member], { shouldDirty: true })} />{member}</label>
+              <label className="flex min-h-11 items-center gap-2"><input type="checkbox" value={member} checked={checked} onChange={() => {
+                const next = checked ? orderedSplitMembers.filter((selected) => selected !== member) : [...orderedSplitMembers, member];
+                setOrderedSplitMembers(next);
+                setValue("splitMembers", next, { shouldDirty: true });
+              }} />{member}</label>
               {checked && splitType === "exact" ? <div>
                 <label htmlFor={`share-${member}`} className="mb-1 block">{member} share</label>
                 <input id={`share-${member}`} inputMode="decimal" {...register(`shares.${member}`)} className="min-h-11 w-full rounded border border-slate-400 px-3" />
