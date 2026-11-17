@@ -16,7 +16,7 @@ Other review and test feedback caught a missing group-router import and SQLAlche
 
 ## Review and recorded verification
 
-Review agents and the parent reviewed changes and test results before commits. Recorded phase checks:
+Review agents and the parent inspected worktree commits before integrating them. Gate failures and browser findings led to corrective commits before ticket resolution. Recorded phase checks:
 
 - Ticket 01: backend pytest 5 passed; frontend tests 2 passed; Ruff, ESLint, and Next.js build passed. PostgreSQL 16.15 migrations and seed were run twice; counts remained 4 users, 2 groups, and 5 memberships.
 - Ticket 02: backend pytest 8 passed; frontend tests 6 passed; Ruff, ESLint, and Next.js build passed.
