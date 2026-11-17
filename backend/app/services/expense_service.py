@@ -7,9 +7,9 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.repositories import expense_repository
-from app.schemas.expense import ExpenseCreateRequest
+from app.schemas.expense import EqualExpenseSplitRequest, ExpenseCreateRequest
 from app.services import group_service
-from app.services.allocation import AllocationError, allocate_exact, parse_money
+from app.services.allocation import AllocationError, allocate_equal, allocate_exact, parse_money
 
 
 def _error(status: int, code: str, message: str, details: dict[str, object] | None = None):
@@ -41,7 +41,7 @@ def _expense_response(expense) -> dict[str, object]:
     }
 
 
-def create_exact_expense(
+def create_expense(
     session: Session,
     username: str | None,
     group_id: int,
@@ -65,7 +65,10 @@ def create_exact_expense(
                     {"member": request.paid_by},
                 )
             amount = parse_money(request.amount)
-            allocations = allocate_exact(amount, request.split.shares)
+            if isinstance(request.split, EqualExpenseSplitRequest):
+                allocations = allocate_equal(amount, request.split.members)
+            else:
+                allocations = allocate_exact(amount, request.split.shares)
             invalid_members = [member for member, _ in allocations if member not in members]
             if invalid_members:
                 raise _error(
@@ -74,17 +77,22 @@ def create_exact_expense(
                     "Every split member must belong to the group.",
                     {"members": invalid_members},
                 )
-
-            canonical = {
-                "description": request.description,
-                "paid_by": request.paid_by,
-                "amount": format(amount, ".2f"),
-                "split": {
+            split_type = request.split.type
+            canonical_split = (
+                {"type": "equal", "members": [member for member, _ in allocations]}
+                if split_type == "equal"
+                else {
                     "type": "exact",
                     "shares": {
                         member: format(share, ".2f") for member, share in sorted(allocations)
                     },
-                },
+                }
+            )
+            canonical = {
+                "description": request.description,
+                "paid_by": request.paid_by,
+                "amount": format(amount, ".2f"),
+                "split": canonical_split,
             }
             request_hash = hashlib.sha256(
                 json.dumps(canonical, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
@@ -107,6 +115,8 @@ def create_exact_expense(
                 expense = expense_repository.find_by_idempotency_key(
                     session, group_id, idempotency_key
                 )
+                expense.split_type = split_type
+                session.flush()
                 return _expense_response(expense), 201
 
             expense = expense_repository.find_by_idempotency_key(session, group_id, idempotency_key)

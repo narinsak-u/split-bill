@@ -538,3 +538,82 @@ def test_create_expense_rejects_empty_or_whitespace_description(client):
         detail = response.json()["error"]["details"][0]
         assert detail["loc"] == ["body", "description"]
         assert "Description must not be blank." in detail["msg"]
+
+
+def test_create_equal_expense_stores_ordered_shares_and_canonical_retry(client, test_engine):
+    key = "equal-order-retry"
+    headers = {"X-User": "alice", "Idempotency-Key": key}
+    payload = {
+        "description": "Dinner",
+        "paid_by": "bob",
+        "amount": "0.05",
+        "split": {"type": "equal", "members": ["carol", "alice"]},
+    }
+    try:
+        created = client.post("/groups/1/expenses", json=payload, headers=headers)
+        retry = client.post(
+            "/groups/1/expenses",
+            json={**payload, "amount": "0.050"},
+            headers=headers,
+        )
+        reordered = client.post(
+            "/groups/1/expenses",
+            json={
+                **payload,
+                "split": {"type": "equal", "members": ["alice", "carol"]},
+            },
+            headers=headers,
+        )
+
+        assert created.status_code == 201
+        expected_shares = [
+            {"username": "carol", "amount": "0.03"},
+            {"username": "alice", "amount": "0.02"},
+        ]
+        assert created.json()["paid_by"] == "bob"
+        assert created.json()["split"] == {"type": "equal", "shares": expected_shares}
+        assert retry.status_code == 200
+        assert retry.json() == created.json()
+        assert reordered.status_code == 409
+        with test_engine.begin() as connection:
+            stored = connection.execute(
+                text(
+                    "SELECT u.username, s.amount FROM expense_shares s "
+                    "JOIN users u ON u.id = s.user_id "
+                    "JOIN expenses e ON e.id = s.expense_id "
+                    "WHERE e.idempotency_key = :key ORDER BY s.allocation_order"
+                ),
+                {"key": key},
+            ).all()
+        assert [(username, f"{amount:.2f}") for username, amount in stored] == [
+            (share["username"], share["amount"]) for share in expected_shares
+        ]
+    finally:
+        _delete_expense_by_key(test_engine, key)
+
+
+def test_create_equal_expense_rejects_invalid_members_and_amount(client, test_engine):
+    key = "equal-invalid"
+    headers = {"X-User": "alice", "Idempotency-Key": key}
+    payload = {
+        "description": "Dinner",
+        "paid_by": "alice",
+        "amount": "1.00",
+        "split": {"type": "equal", "members": ["alice"]},
+    }
+    try:
+        for split, amount, code in (
+            ({"type": "equal", "members": []}, "1.00", "INVALID_SPLIT_MEMBER"),
+            ({"type": "equal", "members": ["alice", "alice"]}, "1.00", "INVALID_SPLIT_MEMBER"),
+            ({"type": "equal", "members": ["dan"]}, "1.00", "INVALID_SPLIT_MEMBER"),
+            ({"type": "equal", "members": ["alice"]}, "0", "INVALID_AMOUNT"),
+        ):
+            response = client.post(
+                "/groups/1/expenses",
+                json={**payload, "amount": amount, "split": split},
+                headers=headers,
+            )
+            assert response.status_code == 422
+            assert response.json()["error"]["code"] == code
+    finally:
+        _delete_expense_by_key(test_engine, key)

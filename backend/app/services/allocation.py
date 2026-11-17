@@ -56,3 +56,27 @@ def allocate_exact(total: Decimal, shares: Mapping[str, str]) -> list[tuple[str,
             {"expected": format(total, ".2f"), "actual": format(actual, ".2f")},
         )
     return allocated
+
+
+def allocate_equal(total: Decimal, members: list[str]) -> list[tuple[str, Decimal]]:
+    if (
+        not isinstance(total, Decimal)
+        or not total.is_finite()
+        or total <= 0
+        or total > _MAX_AMOUNT
+        or total.as_tuple().exponent < -2
+    ):
+        raise AllocationError("INVALID_AMOUNT")
+    if not members:
+        raise AllocationError("INVALID_SPLIT_MEMBER", {"members": []})
+    if any(not isinstance(member, str) or not member for member in members):
+        raise AllocationError("INVALID_SPLIT_MEMBER")
+    if len(set(members)) != len(members):
+        raise AllocationError("INVALID_SPLIT_MEMBER", {"members": members})
+
+    total_satang = int(total * 100)
+    base, remainder = divmod(total_satang, len(members))
+    return [
+        (member, Decimal(base + (index < remainder)) / 100)
+        for index, member in enumerate(members)
+    ]
