@@ -1,6 +1,8 @@
+from datetime import datetime
 from decimal import Decimal
+from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db.models import Expense, ExpenseShare, GroupMember, User
@@ -25,6 +27,36 @@ def find_member_user_ids(session: Session, group_id: int) -> dict[str, int]:
         .where(GroupMember.group_id == group_id)
     )
     return {username: user_id for username, user_id in rows}
+
+
+def find_active_for_delete(session: Session, group_id: int, expense_id: UUID) -> Expense | None:
+    statement = (
+        select(Expense)
+        .where(
+            Expense.id == expense_id,
+            Expense.group_id == group_id,
+            Expense.deleted_at.is_(None),
+        )
+        .with_for_update()
+    )
+    return session.scalar(statement)
+
+
+def soft_delete(
+    session: Session, group_id: int, expense_id: UUID, paid_by_user_id: int, deleted_at: datetime
+) -> bool:
+    statement = (
+        update(Expense)
+        .where(
+            Expense.id == expense_id,
+            Expense.group_id == group_id,
+            Expense.paid_by_user_id == paid_by_user_id,
+            Expense.deleted_at.is_(None),
+        )
+        .values(deleted_at=deleted_at)
+        .returning(Expense.id)
+    )
+    return session.scalar(statement) is not None
 
 
 def insert_if_absent(
