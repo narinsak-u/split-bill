@@ -83,8 +83,7 @@ export default function SplitBillPage() {
               const balance = balances.data.balances.find((entry) => entry.username === member.username);
               const paid = formatBalanceAmount(balance?.paid ?? "0.00");
               const share = formatBalanceAmount(balance?.share ?? "0.00");
-              const satang = parseSatang(balance?.balance ?? "0.00");
-              if (satang === null) throw new Error("Invalid balance amount.");
+              const satang = parseBalanceAmount(balance?.balance ?? "0.00");
               const status = satang > 0 ? "owed" : satang < 0 ? "owes" : "settled";
               const amount = formatSatang(Math.abs(satang));
               const signedAmount = satang > 0 ? `+${amount}` : satang < 0 ? `-${amount}` : amount;
@@ -105,8 +104,13 @@ export default function SplitBillPage() {
     </main>
   );
 }
-function formatBalanceAmount(value: string): string {
-  const satang = parseSatang(value);
+function parseBalanceAmount(value: string): number {
+  const negative = value.startsWith("-");
+  const satang = parseSatang(negative ? value.slice(1) : value);
   if (satang === null) throw new Error("Invalid balance amount.");
-  return formatSatang(satang);
+  return negative ? -satang : satang;
+}
+
+function formatBalanceAmount(value: string): string {
+  return formatSatang(parseBalanceAmount(value));
 }
