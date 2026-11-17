@@ -1,4 +1,18 @@
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, StrictStr
+
+
+class ExactExpenseSplitRequest(BaseModel):
+    type: Literal["exact"]
+    shares: dict[StrictStr, StrictStr]
+
+
+class ExpenseCreateRequest(BaseModel):
+    description: StrictStr
+    paid_by: StrictStr
+    amount: StrictStr
+    split: ExactExpenseSplitRequest
 
 
 class ExpenseShareResponse(BaseModel):

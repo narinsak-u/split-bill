@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getGroup, getGroups } from "../features/groups/api";
 import { getExpenses } from "../features/expenses/api";
+import { ExpenseForm } from "../features/expenses/ExpenseForm";
 import { ExpenseList } from "../features/expenses/ExpenseList";
 
 const users = ["alice", "bob", "carol", "dan"];
@@ -28,6 +29,7 @@ export default function SplitBillPage() {
     queryClient.removeQueries({ queryKey: ["groups"] });
     queryClient.removeQueries({ queryKey: ["group"] });
     queryClient.removeQueries({ queryKey: ["expenses"] });
+    queryClient.removeQueries({ queryKey: ["balances"] });
     setGroupId("");
     setUsername(nextUser);
   }
@@ -67,6 +69,7 @@ export default function SplitBillPage() {
       {groupId && expenses.isPending ? <p role="status" className="mt-5">Loading expenses…</p> : null}
       {groupId && expenses.isError ? <p role="alert" className="mt-5">Could not load expenses.</p> : null}
       {groupId && expenses.isSuccess ? <ExpenseList expenses={expenses.data} /> : null}
+      {detail.data && groupId ? <ExpenseForm key={`${username}-${groupId}`} username={username} groupId={Number(groupId)} members={detail.data.members.map((member) => member.username)} /> : null}
     </main>
   );
 }
