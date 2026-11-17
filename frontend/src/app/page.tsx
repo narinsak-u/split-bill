@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getGroup, getGroups } from "../features/groups/api";
+import { getExpenses } from "../features/expenses/api";
+import { ExpenseList } from "../features/expenses/ExpenseList";
 
 const users = ["alice", "bob", "carol", "dan"];
 
@@ -16,10 +18,16 @@ export default function SplitBillPage() {
     queryFn: () => getGroup(username, Number(groupId)),
     enabled: groupId !== "",
   });
+  const expenses = useQuery({
+    queryKey: ["expenses", username, groupId],
+    queryFn: () => getExpenses(username, Number(groupId)),
+    enabled: groupId !== "",
+  });
 
   function changeUser(nextUser: string) {
     queryClient.removeQueries({ queryKey: ["groups"] });
     queryClient.removeQueries({ queryKey: ["group"] });
+    queryClient.removeQueries({ queryKey: ["expenses"] });
     setGroupId("");
     setUsername(nextUser);
   }
@@ -47,7 +55,6 @@ export default function SplitBillPage() {
       {groups.isPending ? <p role="status" className="mt-5">Loading groups…</p> : null}
       {groups.isError ? <p role="alert" className="mt-5">Could not load groups.</p> : null}
       {groups.isSuccess && groups.data.length === 0 ? <p className="mt-5">No groups available.</p> : null}
-
       {groupId && detail.isPending ? <p role="status" className="mt-5">Loading group…</p> : null}
       {groupId && detail.isError ? <p role="alert" className="mt-5">Could not load group.</p> : null}
       {detail.data ? (
@@ -57,6 +64,9 @@ export default function SplitBillPage() {
           <p className="mt-1 text-slate-700">{detail.data.members.map((member) => member.username).join(", ")}</p>
         </section>
       ) : null}
+      {groupId && expenses.isPending ? <p role="status" className="mt-5">Loading expenses…</p> : null}
+      {groupId && expenses.isError ? <p role="alert" className="mt-5">Could not load expenses.</p> : null}
+      {groupId && expenses.isSuccess ? <ExpenseList expenses={expenses.data} /> : null}
     </main>
   );
 }
