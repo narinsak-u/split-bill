@@ -1,6 +1,14 @@
 from sqlalchemy import text
 
 
+def _delete_expense_by_key(test_engine, idempotency_key):
+    with test_engine.begin() as connection:
+        connection.execute(
+            text("DELETE FROM expenses WHERE idempotency_key = :key"),
+            {"key": idempotency_key},
+        )
+
+
 def test_group_expense_history_is_empty(client):
     response = client.get("/groups/1/expenses", headers={"X-User": "alice"})
 
@@ -97,4 +105,262 @@ def test_inaccessible_group_expense_history_returns_not_found(client):
     response = client.get("/groups/1/expenses", headers={"X-User": "dan"})
 
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "GROUP_NOT_FOUND"
+
+
+def test_create_exact_expense_and_matching_canonical_retry(client, test_engine):
+    payload = {
+        "description": "Lunch  ",
+        "paid_by": "bob",
+        "amount": "10.50",
+        "split": {"type": "exact", "shares": {"alice": "2.5", "carol": "8.00"}},
+    }
+    headers = {"X-User": "alice", "Idempotency-Key": "exact-create"}
+
+    created = client.post("/groups/1/expenses", json=payload, headers=headers)
+    retried = client.post(
+        "/groups/1/expenses",
+        json={
+            **payload,
+            "amount": "10.5",
+            "split": {"type": "exact", "shares": {"carol": "8.0", "alice": "2.50"}},
+        },
+        headers=headers,
+    )
+
+    assert created.status_code == 201
+    assert created.json()["description"] == "Lunch  "
+    assert created.json()["paid_by"] == "bob"
+    assert created.json()["split"] == {
+        "type": "exact",
+        "shares": [{"username": "alice", "amount": "2.50"}, {"username": "carol", "amount": "8.00"}],
+    }
+    assert retried.status_code == 200
+    assert retried.json() == created.json()
+    expense_id = created.json()["id"]
+    with test_engine.begin() as connection:
+        assert connection.execute(
+            text("SELECT count(*) FROM expenses WHERE idempotency_key = 'exact-create'")
+        ).scalar_one() == 1
+        assert connection.execute(
+            text("SELECT count(*) FROM expense_shares WHERE expense_id = CAST(:id AS UUID)"),
+            {"id": expense_id},
+        ).scalar_one() == 2
+    _delete_expense_by_key(test_engine, "exact-create")
+
+
+def test_changed_request_with_same_key_conflicts(client, test_engine):
+    headers = {"X-User": "alice", "Idempotency-Key": "exact-conflict"}
+    payload = {
+        "description": "Lunch",
+        "paid_by": "alice",
+        "amount": "10.00",
+        "split": {"type": "exact", "shares": {"alice": "10.00"}},
+    }
+    assert client.post("/groups/1/expenses", json=payload, headers=headers).status_code == 201
+
+    response = client.post(
+        "/groups/1/expenses",
+        json={**payload, "description": "Dinner"},
+        headers=headers,
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
+    _delete_expense_by_key(test_engine, "exact-conflict")
+
+
+def test_create_exact_expense_rejects_invalid_money_and_members(client):
+    headers = {"X-User": "alice", "Idempotency-Key": "exact-invalid"}
+    payload = {
+        "description": "Lunch",
+        "paid_by": "alice",
+        "amount": "10.00",
+        "split": {"type": "exact", "shares": {"alice": "10.00"}},
+    }
+    for body, code in (
+        ({**payload, "amount": "0"}, "INVALID_AMOUNT"),
+        (
+            {**payload, "split": {"type": "exact", "shares": {"alice": "9.99"}}},
+            "INVALID_SPLIT_TOTAL",
+        ),
+        (
+            {**payload, "split": {"type": "exact", "shares": {"dan": "10.00"}}},
+            "INVALID_SPLIT_MEMBER",
+        ),
+        ({**payload, "amount": "1.001"}, "INVALID_AMOUNT"),
+    ):
+        response = client.post("/groups/1/expenses", json=body, headers=headers)
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == code
+
+
+def test_create_expense_requires_identity_and_idempotency_headers(client):
+    payload = {
+        "description": "Lunch",
+        "paid_by": "alice",
+        "amount": "10.00",
+        "split": {"type": "exact", "shares": {"alice": "10.00"}},
+    }
+    for headers, code in (
+        ({"Idempotency-Key": "missing-user"}, "INVALID_USER"),
+        ({"X-User": "alice"}, "MISSING_IDEMPOTENCY_KEY"),
+    ):
+        response = client.post("/groups/1/expenses", json=payload, headers=headers)
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == code
+
+
+def test_create_expense_checks_payer_membership_and_group_access(client):
+    payload = {
+        "description": "Lunch",
+        "paid_by": "dan",
+        "amount": "10.00",
+        "split": {"type": "exact", "shares": {"alice": "10.00"}},
+    }
+    headers = {"X-User": "alice", "Idempotency-Key": "exact-permissions"}
+    payer_response = client.post("/groups/1/expenses", json=payload, headers=headers)
+    inaccessible_response = client.post(
+        "/groups/1/expenses",
+        json=payload,
+        headers={"X-User": "dan", "Idempotency-Key": "inaccessible"},
+    )
+
+    assert payer_response.status_code == 400
+    assert payer_response.json()["error"]["code"] == "INVALID_SPLIT_MEMBER"
+    assert inaccessible_response.status_code == 404
+    assert inaccessible_response.json()["error"]["code"] == "GROUP_NOT_FOUND"
+
+
+def test_idempotency_key_is_scoped_to_group(client, test_engine):
+    payload = {
+        "description": "Shared key",
+        "paid_by": "bob",
+        "amount": "5.00",
+        "split": {"type": "exact", "shares": {"bob": "5.00"}},
+    }
+    headers = {"X-User": "bob", "Idempotency-Key": "group-scoped-key"}
+
+    first = client.post("/groups/1/expenses", json=payload, headers=headers)
+    second = client.post("/groups/2/expenses", json=payload, headers=headers)
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json()["id"] != second.json()["id"]
+    _delete_expense_by_key(test_engine, "group-scoped-key")
+
+
+def test_concurrent_matching_creates_store_one_expense(client, test_engine):
+    from concurrent.futures import ThreadPoolExecutor
+
+    payload = {
+        "description": "Concurrent lunch",
+        "paid_by": "alice",
+        "amount": "10.00",
+        "split": {"type": "exact", "shares": {"bob": "10.00"}},
+    }
+    headers = {"X-User": "alice", "Idempotency-Key": "exact-concurrent"}
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(
+            pool.map(
+                lambda _: client.post("/groups/1/expenses", json=payload, headers=headers),
+                range(2),
+            )
+        )
+
+    assert sorted(response.status_code for response in responses) == [200, 201]
+    assert responses[0].json() == responses[1].json()
+    expense_id = responses[0].json()["id"]
+    with test_engine.begin() as connection:
+        assert connection.execute(
+            text("SELECT count(*) FROM expenses WHERE idempotency_key = 'exact-concurrent'")
+        ).scalar_one() == 1
+        assert connection.execute(
+            text("SELECT count(*) FROM expense_shares WHERE expense_id = CAST(:id AS UUID)"),
+            {"id": expense_id},
+        ).scalar_one() == 1
+    _delete_expense_by_key(test_engine, "exact-concurrent")
+
+
+def test_failed_share_write_rolls_back_expense_and_allows_retry(client, test_engine):
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    with test_engine.begin() as connection:
+        connection.execute(text("DROP TRIGGER IF EXISTS fail_expense_share_insert ON expense_shares"))
+        connection.execute(text("DROP FUNCTION IF EXISTS fail_expense_share_insert()"))
+        connection.execute(
+            text(
+                """
+                CREATE FUNCTION fail_expense_share_insert() RETURNS trigger
+                LANGUAGE plpgsql AS $$
+                BEGIN
+                    RAISE EXCEPTION 'forced share insert failure';
+                END;
+                $$
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TRIGGER fail_expense_share_insert
+                BEFORE INSERT ON expense_shares
+                FOR EACH ROW EXECUTE FUNCTION fail_expense_share_insert()
+                """
+            )
+        )
+    payload = {
+        "description": "Rollback lunch",
+        "paid_by": "alice",
+        "amount": "10.00",
+        "split": {"type": "exact", "shares": {"bob": "10.00"}},
+    }
+    headers = {"X-User": "alice", "Idempotency-Key": "exact-rollback"}
+    try:
+        with TestClient(app, raise_server_exceptions=False) as guarded_client:
+            failed = guarded_client.post("/groups/1/expenses", json=payload, headers=headers)
+    finally:
+        with test_engine.begin() as connection:
+            connection.execute(
+                text("DROP TRIGGER IF EXISTS fail_expense_share_insert ON expense_shares")
+            )
+            connection.execute(text("DROP FUNCTION IF EXISTS fail_expense_share_insert()"))
+
+    assert failed.status_code == 500
+    assert failed.json()["error"]["code"] == "INTERNAL_SERVER_ERROR"
+    with test_engine.begin() as connection:
+        assert connection.execute(
+            text("SELECT count(*) FROM expenses WHERE idempotency_key = 'exact-rollback'")
+        ).scalar_one() == 0
+        assert connection.execute(
+            text(
+                """
+                SELECT count(*) FROM expense_shares
+                WHERE expense_id IN (
+                    SELECT id FROM expenses WHERE idempotency_key = 'exact-rollback'
+                )
+                """
+            )
+        ).scalar_one() == 0
+
+    retry = client.post("/groups/1/expenses", json=payload, headers=headers)
+
+    assert retry.status_code == 201
+    _delete_expense_by_key(test_engine, "exact-rollback")
+
+
+def test_create_expense_requires_money_and_member_values_as_strings(client):
+    response = client.post(
+        "/groups/1/expenses",
+        json={
+            "description": "Strict input",
+            "paid_by": "alice",
+            "amount": 10,
+            "split": {"type": "exact", "shares": {"alice": "10.00"}},
+        },
+        headers={"X-User": "alice", "Idempotency-Key": "strict-amount"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
