@@ -37,8 +37,8 @@ backend/
   alembic/          migrations
   tests/            API and unit tests
 frontend/
-  src/app/          Next.js pages and app setup
-  src/features/     group and expense UI/API
+  src/app/          Next.js pages, selection/query hook, app setup
+  src/features/     group balances, expense form/validation, feature APIs
   src/lib/          shared utilities
 compose.yaml        local service and database setup
 ```

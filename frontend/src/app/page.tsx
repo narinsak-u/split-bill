@@ -1,44 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getGroup, getGroups } from "../features/groups/api";
-import { getBalances, getExpenses } from "../features/expenses/api";
+import { useGroupView } from "./useGroupView";
+import { GroupBalances } from "../features/groups/GroupBalances";
 import { ExpenseForm } from "../features/expenses/ExpenseForm";
 import { ExpenseList } from "../features/expenses/ExpenseList";
-import { formatMoney } from "../lib/money";
 
 const users = ["alice", "bob", "carol", "dan"];
 
 export default function SplitBillPage() {
-  const [username, setUsername] = useState("alice");
-  const [groupId, setGroupId] = useState("");
-  const queryClient = useQueryClient();
-  const groups = useQuery({ queryKey: ["groups", username], queryFn: () => getGroups(username) });
-  const detail = useQuery({
-    queryKey: ["group", username, groupId],
-    queryFn: () => getGroup(username, Number(groupId)),
-    enabled: groupId !== "",
-  });
-  const expenses = useQuery({
-    queryKey: ["expenses", username, groupId],
-    queryFn: () => getExpenses(username, Number(groupId)),
-    enabled: groupId !== "",
-  });
-  const balances = useQuery({
-    queryKey: ["balances", username, groupId],
-    queryFn: () => getBalances(username, Number(groupId)),
-    enabled: groupId !== "",
-  });
-
-  function changeUser(nextUser: string) {
-    queryClient.removeQueries({ queryKey: ["groups"] });
-    queryClient.removeQueries({ queryKey: ["group"] });
-    queryClient.removeQueries({ queryKey: ["expenses"] });
-    queryClient.removeQueries({ queryKey: ["balances"] });
-    setGroupId("");
-    setUsername(nextUser);
-  }
+  const { username, groupId, setGroupId, changeUser, groups, detail, expenses, balances } = useGroupView();
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-3xl px-6 py-12">
@@ -75,31 +45,7 @@ export default function SplitBillPage() {
       {groupId && expenses.isPending ? <p role="status" className="mt-5">Loading expenses…</p> : null}
       {groupId && balances.isPending ? <p role="status" className="mt-5">Loading balances…</p> : null}
       {groupId && balances.isError ? <p role="alert" className="mt-5">Could not load balances.</p> : null}
-      {detail.data && balances.isSuccess ? (
-        <section aria-label="Group balances" className="mt-8 rounded border border-slate-200 p-5">
-          <h2 className="text-xl font-semibold">Balances</h2>
-          <ul aria-label="Group balances" className="mt-4 divide-y divide-slate-200">
-            {detail.data.members.map((member) => {
-              const balance = balances.data.balances.find((entry) => entry.username === member.username);
-              const paid = formatMoney(balance?.paid ?? "0.00");
-              const share = formatMoney(balance?.share ?? "0.00");
-              const balanceValue = balance?.balance ?? "0.00";
-              const isZero = /^-?0+\.00$/.test(balanceValue);
-              const isNegative = balanceValue.startsWith("-");
-              const status = isZero ? "settled" : isNegative ? "owes" : "owed";
-              const amount = formatMoney(isNegative ? balanceValue.slice(1) : balanceValue);
-              const signedAmount = isZero ? amount : `${isNegative ? "-" : "+"}${amount}`;
-              return (
-                <li key={member.username} aria-label={`${member.username} balance: ${status} ${amount}`} className="flex flex-wrap justify-between gap-2 py-3">
-                  <span className="font-medium">{member.username}</span>
-                  <span>{status === "settled" ? "Settled" : `${status === "owed" ? "Owed" : "Owes"} ${signedAmount}`}</span>
-                  <span className="w-full text-sm text-slate-600">Paid: {paid} · Share: {share}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : null}
+      {detail.data && balances.isSuccess ? <GroupBalances members={detail.data.members} balances={balances.data.balances} /> : null}
       {groupId && expenses.isError ? <p role="alert" className="mt-5">Could not load expenses.</p> : null}
       {groupId && expenses.isSuccess ? <ExpenseList key={`expenses-${username}-${groupId}`} expenses={expenses.data} username={username} groupId={Number(groupId)} /> : null}
       {detail.data && groupId ? <ExpenseForm key={`${username}-${groupId}`} username={username} groupId={Number(groupId)} members={detail.data.members.map((member) => member.username)} /> : null}
