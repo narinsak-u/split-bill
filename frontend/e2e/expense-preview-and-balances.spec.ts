@@ -34,6 +34,9 @@ test("records an equal expense and validates exact shares", async ({ page }) => 
   await expect(balances.getByRole("listitem", { name: "carol balance: owes 3.33" })).toBeVisible();
 
   await form.getByRole("radio", { name: "Exact split" }).check();
+  for (const member of ["alice", "bob", "carol"]) {
+    await form.getByRole("checkbox", { name: member }).check();
+  }
   await form.getByLabel("alice share").fill("3.34");
   await form.getByLabel("bob share").fill("3.33");
   await form.getByLabel("carol share").fill("3.32");
