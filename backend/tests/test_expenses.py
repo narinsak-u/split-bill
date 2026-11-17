@@ -425,24 +425,25 @@ def test_waiting_matching_request_succeeds_after_first_write_rolls_back(client, 
     }
     headers = {"X-User": "alice", "Idempotency-Key": "exact-racing-rollback"}
     try:
-        with TestClient(app, raise_server_exceptions=False) as race_client:
-            with ThreadPoolExecutor(max_workers=2) as pool:
-                first = pool.submit(
+        with TestClient(app, raise_server_exceptions=False) as race_client, ThreadPoolExecutor(
+            max_workers=2
+        ) as pool:
+            first = pool.submit(
+                race_client.post, "/groups/1/expenses", json=payload, headers=headers
+            )
+            try:
+                wait_for_lock("advisory")
+                second = pool.submit(
                     race_client.post, "/groups/1/expenses", json=payload, headers=headers
                 )
-                try:
-                    wait_for_lock("advisory")
-                    second = pool.submit(
-                        race_client.post, "/groups/1/expenses", json=payload, headers=headers
-                    )
-                    wait_for_lock("transactionid")
-                finally:
-                    lock_connection.execute(
-                        text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": lock_id}
-                    )
-                    lock_connection.commit()
-                first_response = first.result(timeout=10)
-                second_response = second.result(timeout=10)
+                wait_for_lock("transactionid")
+            finally:
+                lock_connection.execute(
+                    text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": lock_id}
+                )
+                lock_connection.commit()
+            first_response = first.result(timeout=10)
+            second_response = second.result(timeout=10)
     finally:
         lock_connection.close()
         with test_engine.begin() as connection:
