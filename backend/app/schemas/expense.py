@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, StrictStr, field_validator
+from pydantic import BaseModel, Field, StrictStr, field_validator
 
 
 class ExactExpenseSplitRequest(BaseModel):
@@ -8,11 +8,18 @@ class ExactExpenseSplitRequest(BaseModel):
     shares: dict[StrictStr, StrictStr]
 
 
+class EqualExpenseSplitRequest(BaseModel):
+    type: Literal["equal"]
+    members: list[StrictStr]
+
+
 class ExpenseCreateRequest(BaseModel):
     description: StrictStr
     paid_by: StrictStr
     amount: StrictStr
-    split: ExactExpenseSplitRequest
+    split: Annotated[
+        EqualExpenseSplitRequest | ExactExpenseSplitRequest, Field(discriminator="type")
+    ]
 
     @field_validator("description")
     @classmethod

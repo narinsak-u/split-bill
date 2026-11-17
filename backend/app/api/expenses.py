@@ -28,7 +28,7 @@ def create_expense(
     username: Annotated[str | None, Header(alias="X-User")] = None,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ):
-    body, status_code = expense_service.create_exact_expense(
+    body, status_code = expense_service.create_expense(
         session, username, group_id, request, idempotency_key
     )
     response.status_code = status_code
