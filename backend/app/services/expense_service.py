@@ -2,6 +2,7 @@ import hashlib
 import json
 from datetime import UTC, datetime
 from decimal import Decimal
+from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -149,3 +150,20 @@ def list_expenses(session: Session, username: str | None, group_id: int) -> list
         _expense_response(expense)
         for expense in expense_repository.list_for_group(session, group_id)
     ]
+
+
+def delete_expense(
+    session: Session, username: str | None, group_id: int, expense_id: UUID
+) -> None:
+    with session.begin():
+        group_service.get_group(session, username, group_id)
+        members = expense_repository.find_member_user_ids(session, group_id)
+        expense = expense_repository.find_active_for_delete(session, group_id, expense_id)
+        if expense is None:
+            raise _error(404, "EXPENSE_NOT_FOUND", "Expense not found.")
+        if expense.paid_by_user_id != members[username or ""]:
+            raise _error(403, "EXPENSE_DELETE_FORBIDDEN", "Only the payer can delete this expense.")
+        if not expense_repository.soft_delete(
+            session, group_id, expense_id, expense.paid_by_user_id, datetime.now(UTC)
+        ):
+            raise _error(404, "EXPENSE_NOT_FOUND", "Expense not found.")

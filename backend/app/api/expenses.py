@@ -1,4 +1,5 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Response
 from sqlalchemy.orm import Session
@@ -33,3 +34,14 @@ def create_expense(
     )
     response.status_code = status_code
     return body
+
+
+@router.delete("/{expense_id}", status_code=204)
+def delete_expense(
+    group_id: int,
+    expense_id: UUID,
+    session: Annotated[Session, Depends(get_db)],
+    username: Annotated[str | None, Header(alias="X-User")] = None,
+):
+    expense_service.delete_expense(session, username, group_id, expense_id)
+    return Response(status_code=204)
