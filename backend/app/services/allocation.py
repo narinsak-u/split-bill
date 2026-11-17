@@ -77,6 +77,5 @@ def allocate_equal(total: Decimal, members: list[str]) -> list[tuple[str, Decima
     total_satang = int(total * 100)
     base, remainder = divmod(total_satang, len(members))
     return [
-        (member, Decimal(base + (index < remainder)) / 100)
-        for index, member in enumerate(members)
+        (member, Decimal(base + (index < remainder)) / 100) for index, member in enumerate(members)
     ]
