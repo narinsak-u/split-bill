@@ -274,4 +274,13 @@ describe("exact expense recording", () => {
     const postRequests = requests.filter((request) => request.init?.method === "POST");
     expect((postRequests[0].init?.headers as Record<string, string>)["Idempotency-Key"]).toBe((postRequests[1].init?.headers as Record<string, string>)["Idempotency-Key"]);
   });
+  it("clears expense inputs when the selected group changes", async () => {
+    mockExpenseApi(async () => ({ ok: true, json: async () => ({}) }) as Response);
+    await showForm();
+    fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Draft" } });
+    fireEvent.change(screen.getByLabelText("Group"), { target: { value: "" } });
+    expect(screen.queryByLabelText("Description")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
+    await waitFor(() => expect(screen.getByLabelText("Description")).toHaveValue(""));
+  });
 });
