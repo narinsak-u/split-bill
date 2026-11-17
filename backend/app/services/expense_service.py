@@ -59,7 +59,7 @@ def create_exact_expense(
             members = expense_repository.find_member_user_ids(session, group_id)
             if request.paid_by not in members:
                 raise _error(
-                    400,
+                    422,
                     "INVALID_SPLIT_MEMBER",
                     "Payer must be a member of the group.",
                     {"member": request.paid_by},
@@ -69,7 +69,7 @@ def create_exact_expense(
             invalid_members = [member for member, _ in allocations if member not in members]
             if invalid_members:
                 raise _error(
-                    400,
+                    422,
                     "INVALID_SPLIT_MEMBER",
                     "Every split member must belong to the group.",
                     {"members": invalid_members},

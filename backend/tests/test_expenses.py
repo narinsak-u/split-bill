@@ -505,3 +505,6 @@ def test_create_expense_rejects_empty_or_whitespace_description(client):
 
         assert response.status_code == 422
         assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+        detail = response.json()["error"]["details"][0]
+        assert detail["loc"] == ["body", "description"]
+        assert "Description must not be blank." in detail["msg"]
