@@ -32,6 +32,7 @@ describe("group selection", () => {
         };
         return { ok: true, json: async () => ({ groups: groups[user as keyof typeof groups] ?? [] }) } as Response;
       }
+      if (url.endsWith("/groups/1/balances")) return { ok: true, json: async () => ({ group_id: 1, balances: [], total_balance: "0.00" }) } as Response;
       throw new Error(`Unexpected request: ${url}`);
     }));
 
@@ -71,6 +72,7 @@ describe("group selection", () => {
           created_at: "2025-02-03T12:30:00Z", deleted_at: null,
         }] }) : ({ expenses: [] }) } as Response;
       }
+      if (url.endsWith("/groups/1/balances")) return { ok: true, json: async () => ({ group_id: 1, balances: [], total_balance: "0.00" }) } as Response;
       throw new Error(`Unexpected request: ${url}`);
     }));
 
@@ -99,6 +101,7 @@ describe("group selection", () => {
       const url = String(input);
       if (url.endsWith("/groups")) return { ok: true, json: async () => ({ groups: [{ id: 1, name: "Trip" }] }) } as Response;
       if (url.endsWith("/groups/1")) return { ok: true, json: async () => ({ id: 1, name: "Trip", members: [] }) } as Response;
+      if (url.endsWith("/groups/1/balances")) return { ok: true, json: async () => ({ group_id: 1, balances: [], total_balance: "0.00" }) } as Response;
       if (url.endsWith("/groups/1/expenses")) return { ok: false, json: async () => ({}) } as Response;
       throw new Error(`Unexpected request: ${url}`);
     }));
@@ -114,6 +117,7 @@ describe("group selection", () => {
       const url = String(input);
       if (url.endsWith("/groups")) return { ok: true, json: async () => ({ groups: [{ id: 1, name: "Trip" }] }) } as Response;
       if (url.endsWith("/groups/1")) return { ok: true, json: async () => ({ id: 1, name: "Trip", members: [] }) } as Response;
+      if (url.endsWith("/groups/1/balances")) return { ok: true, json: async () => ({ group_id: 1, balances: [], total_balance: "0.00" }) } as Response;
       if (url.endsWith("/groups/1/expenses")) throw new Error("offline");
       throw new Error(`Unexpected request: ${url}`);
     }));
@@ -133,6 +137,7 @@ describe("group selection", () => {
         const id = Number(url.split("/").at(-1));
         return { ok: true, json: async () => ({ id, name: id === 1 ? "Trip" : "Lunch", members: [] }) } as Response;
       }
+      if (url.endsWith("/groups/1/balances") || url.endsWith("/groups/2/balances")) return { ok: true, json: async () => ({ group_id: 1, balances: [], total_balance: "0.00" }) } as Response;
       if (url.endsWith("/groups/1/expenses")) {
         return pendingExpenses;
       }
@@ -156,6 +161,73 @@ describe("group selection", () => {
     fireEvent.change(screen.getByLabelText("Group"), { target: { value: "2" } });
     expect(await screen.findByText("Lunch", { selector: "h3" })).toBeInTheDocument();
   });
+  it("shows every member with signed, grouped balances", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/groups")) return { ok: true, json: async () => ({ groups: [{ id: 1, name: "Trip" }] }) } as Response;
+      if (url.endsWith("/groups/1")) return { ok: true, json: async () => ({ id: 1, name: "Trip", members: [{ username: "alice" }, { username: "bob" }, { username: "carol" }] }) } as Response;
+      if (url.endsWith("/groups/1/expenses")) return { ok: true, json: async () => ({ expenses: [] }) } as Response;
+      if (url.endsWith("/groups/1/balances")) return { ok: true, json: async () => ({
+        group_id: 1,
+        balances: [
+          { username: "alice", paid: "1234.56", share: "0.00", balance: "1234.56" },
+          { username: "bob", paid: "0.00", share: "1234.56", balance: "-1234.56" },
+        ],
+        total_balance: "0.00",
+      }) } as Response;
+      throw new Error(`Unexpected request: ${url}`);
+    }));
+
+    renderPage();
+    await screen.findByRole("option", { name: "Trip" });
+    fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
+
+    expect(await screen.findByRole("list", { name: "Group balances" })).toBeInTheDocument();
+    expect(screen.getByRole("listitem", { name: "alice balance: owed 1,234.56" })).toHaveTextContent("+1,234.56");
+    expect(screen.getByText("Paid: 1,234.56 · Share: 0.00")).toBeInTheDocument();
+    expect(screen.getByText("Paid: 0.00 · Share: 1,234.56")).toBeInTheDocument();
+    expect(screen.getByRole("listitem", { name: "bob balance: owes 1,234.56" })).toHaveTextContent("-1,234.56");
+    expect(screen.getByRole("listitem", { name: "carol balance: settled 0.00" })).toHaveTextContent("Settled");
+  });
+
+  it("shows balance loading and failure states", async () => {
+    const { promise: pendingBalances } = Promise.withResolvers<Response>();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/groups")) return { ok: true, json: async () => ({ groups: [{ id: 1, name: "Trip" }] }) } as Response;
+      if (url.endsWith("/groups/1")) return { ok: true, json: async () => ({ id: 1, name: "Trip", members: [{ username: "alice" }] }) } as Response;
+      if (url.endsWith("/groups/1/expenses")) return { ok: true, json: async () => ({ expenses: [] }) } as Response;
+      if (url.endsWith("/groups/1/balances")) return pendingBalances;
+      throw new Error(`Unexpected request: ${url}`);
+    }));
+
+    renderPage();
+    await screen.findByRole("option", { name: "Trip" });
+    fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
+    expect(await screen.findByText("Loading balances…")).toBeInTheDocument();
+  });
+
+  it("shows balance API and network errors", async () => {
+    for (const failedResponse of [
+      async () => ({ ok: false, json: async () => ({}) }) as Response,
+      async () => { throw new Error("offline"); },
+    ]) {
+      vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/groups")) return { ok: true, json: async () => ({ groups: [{ id: 1, name: "Trip" }] }) } as Response;
+        if (url.endsWith("/groups/1")) return { ok: true, json: async () => ({ id: 1, name: "Trip", members: [] }) } as Response;
+        if (url.endsWith("/groups/1/expenses")) return { ok: true, json: async () => ({ expenses: [] }) } as Response;
+        if (url.endsWith("/groups/1/balances")) return failedResponse();
+        throw new Error(`Unexpected request: ${url}`);
+      }));
+      renderPage();
+      await screen.findByRole("option", { name: "Trip" });
+      fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
+      expect(await screen.findByText("Could not load balances.")).toBeInTheDocument();
+      cleanup();
+    }
+  });
+
   it("shows empty groups and API failures", async () => {
     vi.stubGlobal("fetch", vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       if ((init?.headers as Record<string, string>)["X-User"] === "carol") {
@@ -171,7 +243,10 @@ describe("group selection", () => {
   });
 });
 describe("exact expense recording", () => {
-  function mockExpenseApi(onCreate: (init: RequestInit) => Response | Promise<Response>) {
+  function mockExpenseApi(
+    onCreate: (init: RequestInit) => Response | Promise<Response>,
+    onBalances: () => Response | Promise<Response> = async () => ({ ok: true, json: async () => ({ group_id: 1, balances: [], total_balance: "0.00" }) }) as Response,
+  ) {
     const requests: { url: string; init?: RequestInit }[] = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -180,6 +255,7 @@ describe("exact expense recording", () => {
       if (url.endsWith("/groups/1")) return { ok: true, json: async () => ({ id: 1, name: "Trip", members: [{ username: "alice" }, { username: "bob" }] }) } as Response;
       if (url.endsWith("/groups/1/expenses") && init?.method === "POST") return onCreate(init);
       if (url.endsWith("/groups/1/expenses")) return { ok: true, json: async () => ({ expenses: [] }) } as Response;
+      if (url.endsWith("/groups/1/balances")) return onBalances();
       throw new Error(`Unexpected request: ${url}`);
     }));
     return requests;
@@ -234,6 +310,39 @@ describe("exact expense recording", () => {
     await waitFor(() => expect(requests.filter((request) => request.init?.method === "POST")).toHaveLength(3));
     const changedKey = (requests.filter((request) => request.init?.method === "POST")[2].init?.headers as Record<string, string>)["Idempotency-Key"];
     expect(changedKey).not.toBe(firstKey);
+  });
+
+  it("refreshes balances after successful expense creation", async () => {
+    let balanceRequests = 0;
+    const requests = mockExpenseApi(
+      async () => ({ ok: true, json: async () => ({}) }) as Response,
+      async () => {
+        balanceRequests += 1;
+        const changed = balanceRequests > 1;
+        return {
+          ok: true,
+          json: async () => ({
+            group_id: 1,
+            balances: [
+              { username: "alice", paid: changed ? "10.00" : "0.00", share: "0.00", balance: changed ? "10.00" : "0.00" },
+              { username: "bob", paid: "0.00", share: changed ? "10.00" : "0.00", balance: changed ? "-10.00" : "0.00" },
+            ],
+            total_balance: "0.00",
+          }),
+        } as Response;
+      },
+    );
+    await showForm();
+    expect(await screen.findByRole("listitem", { name: "alice balance: settled 0.00" })).toBeInTheDocument();
+    enterValidExpense();
+    fireEvent.change(screen.getByLabelText("alice share"), { target: { value: "10.00" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Record expense" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Record expense" }));
+    expect(await screen.findByText("Expense recorded.")).toBeInTheDocument();
+    expect(await screen.findByRole("listitem", { name: "alice balance: owed 10.00" })).toHaveTextContent("+10.00");
+    expect(screen.getByRole("listitem", { name: "bob balance: owes 10.00" })).toHaveTextContent("-10.00");
+    await waitFor(() => expect(balanceRequests).toBe(2));
+    expect(requests.filter((request) => request.url.endsWith("/groups/1/balances"))).toHaveLength(2);
   });
 
   it("posts exact JSON and invalidates expenses and balances after success", async () => {
