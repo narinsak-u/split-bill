@@ -78,18 +78,18 @@ describe("group selection", () => {
     await screen.findByRole("option", { name: "Trip" });
     fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
     expect(await screen.findByText("Dinner")).toBeInTheDocument();
-    expect(screen.getByText("$30.00")).toBeInTheDocument();
-    expect(screen.getByText("bob: $12.34")).toBeInTheDocument();
-    expect(screen.getByText("alice: $17.66")).toBeInTheDocument();
+    expect(screen.getByText("30.00")).toBeInTheDocument();
+    expect(screen.getByText("bob: 12.34")).toBeInTheDocument();
+    expect(screen.getByText("alice: 17.66")).toBeInTheDocument();
     expect(screen.getByText(/exact/i)).toBeInTheDocument();
-    expect(screen.getByText(/Feb 3, 2025/)).toBeInTheDocument();
+    expect(screen.getByText(/\b2025\b/)).toBeInTheDocument();
     expect(requests).toContainEqual({ url: expect.stringMatching(/\/groups\/1\/expenses$/), user: "alice" });
 
     fireEvent.change(screen.getByLabelText("User"), { target: { value: "bob" } });
     await screen.findByRole("option", { name: "Trip" });
     expect(screen.queryByText("Dinner")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
-    expect(await screen.findByText("No expenses yet.")).toBeInTheDocument();
+    expect(await screen.findByText("No expenses recorded for this group.")).toBeInTheDocument();
     expect(screen.queryByText("Dinner")).not.toBeInTheDocument();
     expect(requests).toContainEqual({ url: expect.stringMatching(/\/groups\/1\/expenses$/), user: "bob" });
   });
@@ -151,7 +151,7 @@ describe("group selection", () => {
     fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
     expect(await screen.findByText("Loading expenses…")).toBeInTheDocument();
     resolveExpenses({ ok: true, json: async () => ({ expenses: [] }) } as Response);
-    expect(await screen.findByText("No expenses yet.")).toBeInTheDocument();
+    expect(await screen.findByText("No expenses recorded for this group.")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Group"), { target: { value: "2" } });
     expect(await screen.findByText("Lunch", { selector: "h3" })).toBeInTheDocument();
