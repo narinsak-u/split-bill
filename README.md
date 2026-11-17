@@ -77,6 +77,18 @@ npm ci
 npm test && npm run lint && npm run build
 ```
 
+### End-to-end browser test
+
+Requires Docker Compose and Node.js 22/npm. From the repository root:
+
+```sh
+cd frontend
+npm ci
+npm run test:e2e
+```
+
+The command installs Playwright Chromium if needed, runs the browser test against an isolated stack on ports 3001 and 8001, then removes its containers and database volume.
+
 Backend tests require Python 3.12+. Install dependencies once:
 
 ```sh

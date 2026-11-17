@@ -1,14 +1,15 @@
+import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const frontendDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoDir = resolve(frontendDir, "..");
-const playwrightCli = resolve(frontendDir, "node_modules/@playwright/test/cli.js");
+const projectName = `splitbill-playwright-e2e-${randomUUID().replaceAll("-", "")}`;
 const composeArgs = [
   "compose",
   "--project-name",
-  "splitbill-playwright-e2e",
+  projectName,
   "--project-directory",
   repoDir,
   "-f",
@@ -18,7 +19,9 @@ const env = {
   ...process.env,
   API_PORT: "8001",
   FRONTEND_PORT: "3001",
+  CORS_ORIGINS: "http://127.0.0.1:3001",
   NEXT_PUBLIC_API_URL: "http://127.0.0.1:8001",
+  PLAYWRIGHT_BASE_URL: "http://127.0.0.1:3001",
   PLAYWRIGHT_HTML_OPEN: "never",
 };
 
@@ -38,7 +41,6 @@ async function requireSuccess(command, args, cwd) {
 let exitCode = 1;
 try {
   await requireSuccess(process.execPath, [playwrightCli, "install", "chromium"], frontendDir);
-  await requireSuccess("docker", [...composeArgs, "down", "--volumes", "--remove-orphans"], repoDir);
   await requireSuccess("docker", [...composeArgs, "up", "--build", "--detach", "--wait", "--wait-timeout", "600"], repoDir);
   exitCode = await run(process.execPath, [playwrightCli, "test"], frontendDir);
 } catch (error) {
