@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const frontendDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const playwrightCli = resolve(frontendDir, "node_modules/@playwright/test/cli.js");
 const repoDir = resolve(frontendDir, "..");
 const projectName = `splitbill-playwright-e2e-${randomUUID().replaceAll("-", "")}`;
 const composeArgs = [
