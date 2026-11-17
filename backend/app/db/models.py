@@ -25,6 +25,7 @@ class Group(Base):
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     memberships: Mapped[list["GroupMember"]] = relationship(back_populates="group")
+    expenses: Mapped[list["Expense"]] = relationship(back_populates="group")
 
 
 class Expense(Base):
