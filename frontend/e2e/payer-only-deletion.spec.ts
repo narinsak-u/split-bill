@@ -47,4 +47,9 @@ test("only the payer can delete an expense and balances return to their prior st
   await expect(page.getByRole("status")).toHaveText("Expense deleted.");
   await expect(payerExpense).toHaveCount(0);
   await expect(balances).toHaveText(originalBalances);
+  await page.reload();
+  await group.selectOption({ label: "Chiang Mai trip" });
+  await expect(page.getByRole("heading", { name: "Chiang Mai trip" })).toBeVisible();
+  await expect(page.getByRole("article", { name: `Expense: ${description}` })).toHaveCount(0);
+  await expect(balances).toHaveText(originalBalances);
 });

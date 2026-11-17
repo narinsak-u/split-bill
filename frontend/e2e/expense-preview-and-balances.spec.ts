@@ -20,6 +20,9 @@ test("records an equal expense and validates exact shares", async ({ page }) => 
     "carol: 3.33",
   ]);
   await form.getByRole("button", { name: "Record expense" }).click();
+  await page.reload();
+  await page.getByRole("combobox", { name: "Group" }).selectOption({ label: "Chiang Mai trip" });
+  await expect(page.getByRole("heading", { name: "Chiang Mai trip" })).toBeVisible();
 
   const expense = page.getByRole("article", { name: "Expense: Shared dinner" });
   await expect(expense).toBeVisible();
@@ -46,4 +49,6 @@ test("records an equal expense and validates exact shares", async ({ page }) => 
   await expect(submit).toBeDisabled();
   await form.getByLabel("carol share").fill("3.33");
   await expect(submit).toBeEnabled();
+  await expense.getByRole("button", { name: `Delete Shared dinner` }).click();
+  await expect(expense).toHaveCount(0);
 });

@@ -87,7 +87,7 @@ npm ci
 npm run test:e2e
 ```
 
-The command installs Playwright Chromium if needed, runs the browser test against an isolated stack on ports 3001 and 8001, then removes its containers and database volume.
+The command installs Chromium if needed and runs against a fresh, dedicated Compose project on ports 3001 and 8001. A lock prevents concurrent E2E runs; startup and teardown remove only this project's containers and database volume. Playwright results and failure traces remain under `frontend/test-results/<run-id>/`; remove `frontend/test-results/` to clear them.
 
 Backend tests require Python 3.12+. Install dependencies once:
 

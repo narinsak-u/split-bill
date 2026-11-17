@@ -6,7 +6,7 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: "list",
-  outputDir: "./test-results",
+  outputDir: process.env.PLAYWRIGHT_OUTPUT_DIR ?? "./test-results",
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3001",
     ...devices["Desktop Chrome"],
