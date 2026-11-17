@@ -59,11 +59,13 @@ export function ExpenseForm({ username, groupId, members }: { username: string; 
     mode: "onChange",
     defaultValues: { description: "", amount: "", paid_by: members[0] ?? "", splitType: "exact", splitMembers: [], shares: Object.fromEntries(members.map((member) => [member, ""])) },
   });
-  const { register, handleSubmit, watch, reset, setValue, formState: { errors, isValid, isSubmitting } } = form;
-  const amount = watch("amount");
-  const splitType = watch("splitType");
-  const splitMembers = watch("splitMembers");
-  const shares = watch("shares");
+  const { register, handleSubmit, watch, reset, setValue, formState: { errors, isSubmitting } } = form;
+  const values = watch();
+  const amount = values.amount;
+  const splitType = values.splitType;
+  const splitMembers = values.splitMembers;
+  const shares = values.shares;
+  const canSubmit = schema.safeParse(values).success;
 
   useEffect(() => watch((values) => {
     if (attempt.current && JSON.stringify(values) !== attempt.current.signature) attempt.current = null;
@@ -156,7 +158,7 @@ export function ExpenseForm({ username, groupId, members }: { username: string; 
         {equalPreview.map(({ member, satang }) => <li key={member}>{member}: {formatSatang(satang)}</li>)}
       </ul> : <p aria-live="polite">Unallocated: {unallocated === null ? "—" : formatSatang(unallocated)}</p>}
       {feedback ? <p role={feedback.kind === "error" ? "alert" : "status"}>{feedback.message}</p> : null}
-      <button type="submit" disabled={!isValid || isSubmitting} className="min-h-11 rounded bg-slate-900 px-4 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50">
+      <button type="submit" disabled={!canSubmit || isSubmitting} className="min-h-11 rounded bg-slate-900 px-4 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50">
         {isSubmitting ? "Recording…" : "Record expense"}
       </button>
     </form>
