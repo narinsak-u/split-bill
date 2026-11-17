@@ -25,18 +25,23 @@ function chooseMembers(...members: string[]) {
   for (const member of members) fireEvent.click(screen.getByRole("checkbox", { name: member }));
 }
 
+function chooseMembersNatively(...members: string[]) {
+  for (const member of members) (screen.getByRole("checkbox", { name: member }) as HTMLInputElement).click();
+}
+
 function enterExpense(amount: string) {
   fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Dinner" } });
   fireEvent.change(screen.getByLabelText("Amount"), { target: { value: amount } });
 }
 
 describe("equal expense recording", () => {
-  it("previews and submits three-way rounding in selected member order", async () => {
+  it("previews and submits three-way rounding in native selection order", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 201 }));
     vi.stubGlobal("fetch", fetchMock);
     renderForm();
     chooseEqual();
-    chooseMembers("carol", "alice", "bob");
+    chooseMembersNatively("carol", "alice", "bob");
+    fireEvent.change(screen.getByLabelText("Payer"), { target: { value: "bob" } });
     enterExpense("100.00");
 
     const preview = screen.getByLabelText("Equal split preview");
@@ -50,10 +55,30 @@ describe("equal expense recording", () => {
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     expect(JSON.parse(String(init.body))).toEqual({
       description: "Dinner",
-      paid_by: "alice",
+      paid_by: "bob",
       amount: "100.00",
       split: { type: "equal", members: ["carol", "alice", "bob"] },
     });
+    expect(await screen.findByText("Expense recorded.")).toBeTruthy();
+    expect(screen.queryAllByRole("alert")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Record expense" })).toBeDisabled();
+  });
+
+  it("posts the native selection order that matches the remainder preview", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    renderForm();
+    chooseEqual();
+    chooseMembersNatively("carol", "alice");
+    fireEvent.change(screen.getByLabelText("Payer"), { target: { value: "bob" } });
+    enterExpense("0.05");
+
+    const preview = screen.getByLabelText("Equal split preview");
+    expect(Array.from(preview.querySelectorAll("li"), (item) => item.textContent)).toEqual(["carol: 0.03", "alice: 0.02"]);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Record expense" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Record expense" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).split).toEqual({ type: "equal", members: ["carol", "alice"] });
   });
 
   it("allocates one satang by selected order and keeps empty selection disabled", async () => {
