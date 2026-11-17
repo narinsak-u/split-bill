@@ -7,13 +7,20 @@ from app.services.allocation import AllocationError, allocate_exact, parse_money
 
 @pytest.mark.parametrize(
     ("value", "expected"),
-    [("0", Decimal("0")), ("12", Decimal("12")), ("12.3", Decimal("12.30")), ("12.34", Decimal("12.34"))],
+    [
+        ("0", Decimal(0)),
+        ("12", Decimal(12)),
+        ("12.3", Decimal("12.30")),
+        ("12.34", Decimal("12.34")),
+    ],
 )
 def test_parse_money_accepts_valid_decimal_strings(value, expected):
     assert parse_money(value, allow_zero=True) == expected
 
 
-@pytest.mark.parametrize("value", ["NaN", "Infinity", "-Infinity", "1.001", "-0.01", "10000000000.00", "abc", "1e2", ""])
+@pytest.mark.parametrize(
+    "value", ["NaN", "Infinity", "-Infinity", "1.001", "-0.01", "10000000000.00", "abc", "1e2", ""]
+)
 def test_parse_money_rejects_invalid_or_out_of_range_strings(value):
     with pytest.raises(AllocationError) as error:
         parse_money(value, allow_zero=True)
@@ -61,7 +68,9 @@ def test_allocate_exact_rejects_total_with_excess_precision():
     assert error.value.code == "INVALID_AMOUNT"
 
 
-@pytest.mark.parametrize("shares", [{"alice": "-0.01"}, {"": "1.00"}, {"alice": "1.001"}, {"alice": "10000000000.00"}])
+@pytest.mark.parametrize(
+    "shares", [{"alice": "-0.01"}, {"": "1.00"}, {"alice": "1.001"}, {"alice": "10000000000.00"}]
+)
 def test_allocate_exact_rejects_invalid_member_or_share(shares):
     with pytest.raises(AllocationError) as error:
         allocate_exact(Decimal("1.00"), shares)

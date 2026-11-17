@@ -83,5 +83,3 @@ def find_by_idempotency_key(
         )
     )
     return session.scalar(statement)
-
-

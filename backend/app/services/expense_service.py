@@ -82,8 +82,7 @@ def create_exact_expense(
                 "split": {
                     "type": "exact",
                     "shares": {
-                        member: format(share, ".2f")
-                        for member, share in sorted(allocations)
+                        member: format(share, ".2f") for member, share in sorted(allocations)
                     },
                 },
             }
@@ -110,9 +109,7 @@ def create_exact_expense(
                 )
                 return _expense_response(expense), 201
 
-            expense = expense_repository.find_by_idempotency_key(
-                session, group_id, idempotency_key
-            )
+            expense = expense_repository.find_by_idempotency_key(session, group_id, idempotency_key)
             if expense is None or expense.request_hash != request_hash:
                 raise _error(
                     409,

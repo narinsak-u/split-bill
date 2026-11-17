@@ -1,7 +1,6 @@
 import re
+from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
-from typing import Mapping
-
 
 _MONEY_PATTERN = re.compile(r"\d+(?:\.\d{1,2})?\Z")
 _MAX_AMOUNT = Decimal("9999999999.99")

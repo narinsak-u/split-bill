@@ -132,19 +132,28 @@ def test_create_exact_expense_and_matching_canonical_retry(client, test_engine):
     assert created.json()["paid_by"] == "bob"
     assert created.json()["split"] == {
         "type": "exact",
-        "shares": [{"username": "alice", "amount": "2.50"}, {"username": "carol", "amount": "8.00"}],
+        "shares": [
+            {"username": "alice", "amount": "2.50"},
+            {"username": "carol", "amount": "8.00"},
+        ],
     }
     assert retried.status_code == 200
     assert retried.json() == created.json()
     expense_id = created.json()["id"]
     with test_engine.begin() as connection:
-        assert connection.execute(
-            text("SELECT count(*) FROM expenses WHERE idempotency_key = 'exact-create'")
-        ).scalar_one() == 1
-        assert connection.execute(
-            text("SELECT count(*) FROM expense_shares WHERE expense_id = CAST(:id AS UUID)"),
-            {"id": expense_id},
-        ).scalar_one() == 2
+        assert (
+            connection.execute(
+                text("SELECT count(*) FROM expenses WHERE idempotency_key = 'exact-create'")
+            ).scalar_one()
+            == 1
+        )
+        assert (
+            connection.execute(
+                text("SELECT count(*) FROM expense_shares WHERE expense_id = CAST(:id AS UUID)"),
+                {"id": expense_id},
+            ).scalar_one()
+            == 2
+        )
     _delete_expense_by_key(test_engine, "exact-create")
 
 
@@ -271,13 +280,19 @@ def test_concurrent_matching_creates_store_one_expense(client, test_engine):
     assert responses[0].json() == responses[1].json()
     expense_id = responses[0].json()["id"]
     with test_engine.begin() as connection:
-        assert connection.execute(
-            text("SELECT count(*) FROM expenses WHERE idempotency_key = 'exact-concurrent'")
-        ).scalar_one() == 1
-        assert connection.execute(
-            text("SELECT count(*) FROM expense_shares WHERE expense_id = CAST(:id AS UUID)"),
-            {"id": expense_id},
-        ).scalar_one() == 1
+        assert (
+            connection.execute(
+                text("SELECT count(*) FROM expenses WHERE idempotency_key = 'exact-concurrent'")
+            ).scalar_one()
+            == 1
+        )
+        assert (
+            connection.execute(
+                text("SELECT count(*) FROM expense_shares WHERE expense_id = CAST(:id AS UUID)"),
+                {"id": expense_id},
+            ).scalar_one()
+            == 1
+        )
     _delete_expense_by_key(test_engine, "exact-concurrent")
 
 
@@ -287,7 +302,9 @@ def test_failed_share_write_rolls_back_expense_and_allows_retry(client, test_eng
     from app.main import app
 
     with test_engine.begin() as connection:
-        connection.execute(text("DROP TRIGGER IF EXISTS fail_expense_share_insert ON expense_shares"))
+        connection.execute(
+            text("DROP TRIGGER IF EXISTS fail_expense_share_insert ON expense_shares")
+        )
         connection.execute(text("DROP FUNCTION IF EXISTS fail_expense_share_insert()"))
         connection.execute(
             text(
@@ -330,19 +347,25 @@ def test_failed_share_write_rolls_back_expense_and_allows_retry(client, test_eng
     assert failed.status_code == 500
     assert failed.json()["error"]["code"] == "INTERNAL_SERVER_ERROR"
     with test_engine.begin() as connection:
-        assert connection.execute(
-            text("SELECT count(*) FROM expenses WHERE idempotency_key = 'exact-rollback'")
-        ).scalar_one() == 0
-        assert connection.execute(
-            text(
-                """
+        assert (
+            connection.execute(
+                text("SELECT count(*) FROM expenses WHERE idempotency_key = 'exact-rollback'")
+            ).scalar_one()
+            == 0
+        )
+        assert (
+            connection.execute(
+                text(
+                    """
                 SELECT count(*) FROM expense_shares
                 WHERE expense_id IN (
                     SELECT id FROM expenses WHERE idempotency_key = 'exact-rollback'
                 )
                 """
-            )
-        ).scalar_one() == 0
+                )
+            ).scalar_one()
+            == 0
+        )
 
     retry = client.post("/groups/1/expenses", json=payload, headers=headers)
 
@@ -425,9 +448,10 @@ def test_waiting_matching_request_succeeds_after_first_write_rolls_back(client, 
     }
     headers = {"X-User": "alice", "Idempotency-Key": "exact-racing-rollback"}
     try:
-        with TestClient(app, raise_server_exceptions=False) as race_client, ThreadPoolExecutor(
-            max_workers=2
-        ) as pool:
+        with (
+            TestClient(app, raise_server_exceptions=False) as race_client,
+            ThreadPoolExecutor(max_workers=2) as pool,
+        ):
             first = pool.submit(
                 race_client.post, "/groups/1/expenses", json=payload, headers=headers
             )
@@ -456,21 +480,27 @@ def test_waiting_matching_request_succeeds_after_first_write_rolls_back(client, 
     assert first_response.status_code == 500
     assert second_response.status_code == 201
     with test_engine.begin() as connection:
-        assert connection.execute(
-            text(
-                "SELECT count(*) FROM expenses WHERE idempotency_key = 'exact-racing-rollback'"
-            )
-        ).scalar_one() == 1
-        assert connection.execute(
-            text(
-                """
+        assert (
+            connection.execute(
+                text(
+                    "SELECT count(*) FROM expenses WHERE idempotency_key = 'exact-racing-rollback'"
+                )
+            ).scalar_one()
+            == 1
+        )
+        assert (
+            connection.execute(
+                text(
+                    """
                 SELECT count(*) FROM expense_shares
                 WHERE expense_id = (
                     SELECT id FROM expenses WHERE idempotency_key = 'exact-racing-rollback'
                 )
                 """
-            )
-        ).scalar_one() == 1
+                )
+            ).scalar_one()
+            == 1
+        )
     _delete_expense_by_key(test_engine, "exact-racing-rollback")
 
 
