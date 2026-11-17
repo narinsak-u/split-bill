@@ -14,24 +14,24 @@ test("records an equal expense and validates exact shares", async ({ page }) => 
     await form.getByRole("checkbox", { name: member }).check();
   }
 
-  await expect(form.getByRole("list", { name: "Equal split preview" })).toHaveText([
-    "alice: $3.34",
-    "bob: $3.33",
-    "carol: $3.33",
+  await expect(form.getByRole("list", { name: "Equal split preview" }).getByRole("listitem")).toHaveText([
+    "alice: 3.34",
+    "bob: 3.33",
+    "carol: 3.33",
   ]);
   await form.getByRole("button", { name: "Record expense" }).click();
 
   const expense = page.getByRole("article", { name: "Expense: Shared dinner" });
   await expect(expense).toBeVisible();
-  await expect(expense.getByRole("list", { name: "Shares for Shared dinner" })).toHaveText([
-    "alice: $3.34",
-    "bob: $3.33",
-    "carol: $3.33",
+  await expect(expense.getByRole("list", { name: "Shares for Shared dinner" }).getByRole("listitem")).toHaveText([
+    "alice: 3.34",
+    "bob: 3.33",
+    "carol: 3.33",
   ]);
   const balances = page.getByRole("list", { name: "Group balances" });
-  await expect(balances.getByRole("listitem", { name: "alice balance: owed $6.66" })).toBeVisible();
-  await expect(balances.getByRole("listitem", { name: "bob balance: owes $3.33" })).toBeVisible();
-  await expect(balances.getByRole("listitem", { name: "carol balance: owes $3.33" })).toBeVisible();
+  await expect(balances.getByRole("listitem", { name: "alice balance: owed 6.66" })).toBeVisible();
+  await expect(balances.getByRole("listitem", { name: "bob balance: owes 3.33" })).toBeVisible();
+  await expect(balances.getByRole("listitem", { name: "carol balance: owes 3.33" })).toBeVisible();
 
   await form.getByRole("radio", { name: "Exact split" }).check();
   await form.getByLabel("alice share").fill("3.34");
