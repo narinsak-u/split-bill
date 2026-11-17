@@ -137,7 +137,7 @@ export function ExpenseForm({ username, groupId, members }: { username: string; 
           {members.map((member) => {
             const checked = splitMembers?.includes(member) ?? false;
             return <div key={member} className="grid gap-2 sm:grid-cols-2 sm:items-center">
-              <label className="flex min-h-11 items-center gap-2"><input type="checkbox" value={member} checked={checked} onChange={() => setValue("splitMembers", checked ? (splitMembers ?? []).filter((selected) => selected !== member) : [...(splitMembers ?? []), member], { shouldDirty: true, shouldValidate: true })} />{member}</label>
+              <label className="flex min-h-11 items-center gap-2"><input type="checkbox" value={member} {...register("splitMembers")} checked={checked} onChange={() => setValue("splitMembers", checked ? (splitMembers ?? []).filter((selected) => selected !== member) : [...(splitMembers ?? []), member], { shouldDirty: true, shouldValidate: true })} />{member}</label>
               {checked && splitType === "exact" ? <div>
                 <label htmlFor={`share-${member}`} className="mb-1 block">{member} share</label>
                 <input id={`share-${member}`} inputMode="decimal" {...register(`shares.${member}`)} className="min-h-11 w-full rounded border border-slate-400 px-3" />

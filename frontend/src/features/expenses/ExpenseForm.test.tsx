@@ -93,3 +93,14 @@ describe("equal expense recording", () => {
     expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body)).split).toEqual({ type: "equal", members: ["alice", "bob"] });
   });
 });
+
+describe("exact expense recording", () => {
+  it("enables submission when exact fields become valid after selecting members", async () => {
+    renderForm();
+    chooseMembers("alice");
+    enterExpense("1.00");
+    fireEvent.change(screen.getByLabelText("alice share"), { target: { value: "1.00" } });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Record expense" })).toBeEnabled());
+  });
+});
