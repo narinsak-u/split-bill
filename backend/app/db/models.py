@@ -2,7 +2,18 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Identity, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Identity,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import CHAR, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -44,7 +55,9 @@ class Expense(Base):
     split_type: Mapped[str] = mapped_column(String(10), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
     request_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     group: Mapped[Group] = relationship(back_populates="expenses")
     payer: Mapped[User] = relationship()
@@ -58,7 +71,9 @@ class ExpenseShare(Base):
     __table_args__ = (
         CheckConstraint("amount >= 0", name="ck_expense_shares_amount_nonnegative"),
         CheckConstraint("allocation_order >= 0", name="ck_expense_shares_order_nonnegative"),
-        UniqueConstraint("expense_id", "allocation_order", name="uq_expense_shares_allocation_order"),
+        UniqueConstraint(
+            "expense_id", "allocation_order", name="uq_expense_shares_allocation_order"
+        ),
     )
 
     expense_id: Mapped[uuid.UUID] = mapped_column(
@@ -69,7 +84,6 @@ class ExpenseShare(Base):
     allocation_order: Mapped[int] = mapped_column(nullable=False)
     expense: Mapped[Expense] = relationship(back_populates="shares")
     user: Mapped[User] = relationship()
-
 
 
 class GroupMember(Base):

@@ -5,9 +5,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.groups import router as groups_router
-
 from app.api.expenses import router as expenses_router
+from app.api.groups import router as groups_router
 
 app = FastAPI(title="SplitBill API")
 origins = [

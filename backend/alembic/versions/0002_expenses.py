@@ -20,14 +20,18 @@ def upgrade() -> None:
         sa.Column("split_type", sa.String(10), nullable=False),
         sa.Column("idempotency_key", sa.String(255), nullable=False),
         sa.Column("request_hash", sa.CHAR(64), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint("amount > 0", name="ck_expenses_amount_positive"),
         sa.CheckConstraint("split_type IN ('equal', 'exact')", name="ck_expenses_split_type"),
         sa.ForeignKeyConstraint(["group_id"], ["groups.id"]),
         sa.ForeignKeyConstraint(["paid_by_user_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("group_id", "idempotency_key", name="uq_expenses_group_idempotency_key"),
+        sa.UniqueConstraint(
+            "group_id", "idempotency_key", name="uq_expenses_group_idempotency_key"
+        ),
     )
     op.create_index(
         "ix_expenses_group_created_at",
@@ -45,7 +49,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["expense_id"], ["expenses.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("expense_id", "user_id"),
-        sa.UniqueConstraint("expense_id", "allocation_order", name="uq_expense_shares_allocation_order"),
+        sa.UniqueConstraint(
+            "expense_id", "allocation_order", name="uq_expense_shares_allocation_order"
+        ),
     )
 
 

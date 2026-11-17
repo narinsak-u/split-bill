@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -11,8 +11,8 @@ def _timestamp(value: datetime | None) -> str | None:
     if value is None:
         return None
     if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def list_expenses(session: Session, username: str | None, group_id: int) -> list[dict[str, object]]:
@@ -27,7 +27,10 @@ def list_expenses(session: Session, username: str | None, group_id: int) -> list
             "split": {
                 "type": expense.split_type,
                 "shares": [
-                    {"username": share.user.username, "amount": format(Decimal(share.amount), ".2f")}
+                    {
+                        "username": share.user.username,
+                        "amount": format(Decimal(share.amount), ".2f"),
+                    }
                     for share in expense.shares
                 ],
             },
