@@ -44,7 +44,21 @@ def test_allocate_exact_allows_zero_shares():
     ]
 
 
-@pytest.mark.parametrize("shares", [{}, {"alice": "1.00", "bob": "0"}])
+@pytest.mark.parametrize("shares", [{}, {"alice": "1.00", "bob": "0.01"}])
+def test_allocate_exact_rejects_empty_or_mismatched_shares(shares):
+    with pytest.raises(AllocationError) as error:
+        allocate_exact(Decimal("1.00"), shares)
+
+    assert error.value.code == "INVALID_SPLIT_TOTAL"
+    assert "expected" in error.value.details
+    assert "actual" in error.value.details
+
+
+def test_allocate_exact_rejects_total_with_excess_precision():
+    with pytest.raises(AllocationError) as error:
+        allocate_exact(Decimal("1.000"), {"alice": "1.00"})
+
+    assert error.value.code == "INVALID_AMOUNT"
 def test_allocate_exact_rejects_empty_or_mismatched_shares(shares):
     with pytest.raises(AllocationError) as error:
         allocate_exact(Decimal("1.00"), shares)
