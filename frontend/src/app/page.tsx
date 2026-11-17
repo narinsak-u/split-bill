@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getGroup, getGroups } from "../features/groups/api";
-import { getBalances, getExpenses } from "../features/expenses/api";
+import { getExpenses } from "../features/expenses/api";
 import { ExpenseForm } from "../features/expenses/ExpenseForm";
 import { ExpenseList } from "../features/expenses/ExpenseList";
 
@@ -22,11 +22,6 @@ export default function SplitBillPage() {
   const expenses = useQuery({
     queryKey: ["expenses", username, groupId],
     queryFn: () => getExpenses(username, Number(groupId)),
-    enabled: groupId !== "",
-  });
-  const balances = useQuery({
-    queryKey: ["balances", username, groupId],
-    queryFn: () => getBalances(username, Number(groupId)),
     enabled: groupId !== "",
   });
 
@@ -75,8 +70,6 @@ export default function SplitBillPage() {
       {groupId && expenses.isError ? <p role="alert" className="mt-5">Could not load expenses.</p> : null}
       {groupId && expenses.isSuccess ? <ExpenseList expenses={expenses.data} /> : null}
       {detail.data && groupId ? <ExpenseForm key={`${username}-${groupId}`} username={username} groupId={Number(groupId)} members={detail.data.members.map((member) => member.username)} /> : null}
-      {groupId && balances.isError ? <p role="alert" className="mt-5">Could not load balances.</p> : null}
-      {balances.data ? <section aria-label="Group balances" className="mt-8 rounded border border-slate-200 p-5"><h2 className="text-xl font-semibold">Balances</h2><ul className="mt-3 space-y-1">{balances.data.balances.map((balance) => <li key={balance.username}>{balance.username}: {balance.balance}</li>)}</ul></section> : null}
     </main>
   );
 }
