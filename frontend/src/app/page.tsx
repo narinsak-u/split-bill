@@ -99,7 +99,7 @@ export default function SplitBillPage() {
         </section>
       ) : null}
       {groupId && expenses.isError ? <p role="alert" className="mt-5">Could not load expenses.</p> : null}
-      {groupId && expenses.isSuccess ? <ExpenseList expenses={expenses.data} /> : null}
+      {groupId && expenses.isSuccess ? <ExpenseList key={`${username}-${groupId}`} expenses={expenses.data} username={username} groupId={Number(groupId)} /> : null}
       {detail.data && groupId ? <ExpenseForm key={`${username}-${groupId}`} username={username} groupId={Number(groupId)} members={detail.data.members.map((member) => member.username)} /> : null}
     </main>
   );
