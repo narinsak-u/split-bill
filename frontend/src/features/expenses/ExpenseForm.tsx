@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
@@ -51,8 +51,11 @@ export function ExpenseForm({ username, groupId, members }: { username: string; 
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const attempt = useRef<Attempt | null>(null);
+  const membersSignature = JSON.stringify(members);
+  const schema = useMemo(() => createFormSchema(JSON.parse(membersSignature) as string[]), [membersSignature]);
+  const resolver = useMemo(() => zodResolver(schema), [schema]);
   const form = useForm<FormValues>({
-    resolver: zodResolver(createFormSchema(members)),
+    resolver,
     mode: "onChange",
     defaultValues: { description: "", amount: "", paid_by: members[0] ?? "", splitType: "exact", splitMembers: [], shares: Object.fromEntries(members.map((member) => [member, ""])) },
   });
