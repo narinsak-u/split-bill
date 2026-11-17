@@ -152,9 +152,7 @@ def list_expenses(session: Session, username: str | None, group_id: int) -> list
     ]
 
 
-def delete_expense(
-    session: Session, username: str | None, group_id: int, expense_id: UUID
-) -> None:
+def delete_expense(session: Session, username: str | None, group_id: int, expense_id: UUID) -> None:
     with session.begin():
         group_service.get_group(session, username, group_id)
         members = expense_repository.find_member_user_ids(session, group_id)

@@ -2,7 +2,6 @@ from uuid import uuid4
 
 from sqlalchemy import text
 
-
 PAYLOAD = {
     "description": "Delete test",
     "paid_by": "alice",
@@ -19,9 +18,7 @@ def _cleanup(test_engine, key):
         )
 
 
-def test_payer_delete_soft_deletes_expense_and_removes_history_and_balance(
-    client, test_engine
-):
+def test_payer_delete_soft_deletes_expense_and_removes_history_and_balance(client, test_engine):
     key = f"delete-{uuid4()}"
     headers = {"X-User": "alice", "Idempotency-Key": key}
     try:
@@ -46,10 +43,15 @@ def test_payer_delete_soft_deletes_expense_and_removes_history_and_balance(
                 text("SELECT deleted_at IS NOT NULL FROM expenses WHERE id = CAST(:id AS UUID)"),
                 {"id": expense_id},
             )
-            assert connection.scalar(
-                text("SELECT count(*) FROM expense_shares WHERE expense_id = CAST(:id AS UUID)"),
-                {"id": expense_id},
-            ) == 2
+            assert (
+                connection.scalar(
+                    text(
+                        "SELECT count(*) FROM expense_shares WHERE expense_id = CAST(:id AS UUID)"
+                    ),
+                    {"id": expense_id},
+                )
+                == 2
+            )
     finally:
         _cleanup(test_engine, key)
 
@@ -63,9 +65,7 @@ def test_delete_hides_expenses_from_inaccessible_users_and_missing_targets(clien
         expense_id = created.json()["id"]
 
         forbidden = client.delete(f"/groups/1/expenses/{expense_id}", headers={"X-User": "bob"})
-        inaccessible = client.delete(
-            f"/groups/1/expenses/{expense_id}", headers={"X-User": "dan"}
-        )
+        inaccessible = client.delete(f"/groups/1/expenses/{expense_id}", headers={"X-User": "dan"})
         missing_group = client.delete(
             f"/groups/999999999/expenses/{expense_id}", headers={"X-User": "alice"}
         )
@@ -123,14 +123,24 @@ def test_deleted_expense_retry_returns_original_without_resurrection(client, tes
         assert conflict.status_code == 409
         assert conflict.json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
         with test_engine.connect() as connection:
-            assert connection.scalar(
-                text("SELECT count(*) FROM expenses WHERE group_id = 1 AND idempotency_key = :key"),
-                {"key": key},
-            ) == 1
-            assert connection.scalar(
-                text("SELECT count(*) FROM expense_shares WHERE expense_id = CAST(:id AS UUID)"),
-                {"id": expense_id},
-            ) == 2
+            assert (
+                connection.scalar(
+                    text(
+                        "SELECT count(*) FROM expenses WHERE group_id = 1 AND idempotency_key = :key"
+                    ),
+                    {"key": key},
+                )
+                == 1
+            )
+            assert (
+                connection.scalar(
+                    text(
+                        "SELECT count(*) FROM expense_shares WHERE expense_id = CAST(:id AS UUID)"
+                    ),
+                    {"id": expense_id},
+                )
+                == 2
+            )
             assert connection.scalar(
                 text("SELECT deleted_at IS NOT NULL FROM expenses WHERE id = CAST(:id AS UUID)"),
                 {"id": expense_id},
