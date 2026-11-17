@@ -22,11 +22,11 @@ def test_history_returns_stored_shares_ordered_and_excludes_deleted_rows(client,
                     id, group_id, paid_by_user_id, description, amount, split_type,
                     idempotency_key, request_hash, created_at, deleted_at
                 ) VALUES
-                    (:older, 1, 1, 'Older', 10, 'equal', 'history-older', :hash,
+                    (CAST(:older AS UUID), 1, 1, 'Older', 10, 'equal', 'history-older', :hash,
                      '2026-01-01T10:00:00Z', NULL),
-                    (:tie_low, 1, 1, 'Tie low', 20, 'exact', 'history-tie-low', :hash,
+                    (CAST(:tie_low AS UUID), 1, 1, 'Tie low', 20, 'exact', 'history-tie-low', :hash,
                      '2026-01-02T10:00:00Z', NULL),
-                    (:tie_high, 1, 1, 'Tie high', 30, 'exact', 'history-tie-high', :hash,
+                    (CAST(:tie_high AS UUID), 1, 1, 'Tie high', 30, 'exact', 'history-tie-high', :hash,
                      '2026-01-02T10:00:00Z', NULL)
                 """
             ),
@@ -42,14 +42,14 @@ def test_history_returns_stored_shares_ordered_and_excludes_deleted_rows(client,
                 """
                 INSERT INTO expense_shares (expense_id, user_id, amount, allocation_order)
                 VALUES
-                    (:tie_high, 3, 10, 1), (:tie_high, 1, 20, 0),
-                    (:tie_low, 2, 20, 0), (:older, 1, 10, 0)
+                    (CAST(:tie_high AS UUID), 3, 10, 1), (CAST(:tie_high AS UUID), 1, 20, 0),
+                    (CAST(:tie_low AS UUID), 2, 20, 0), (CAST(:older AS UUID), 1, 10, 0)
                 """
             ),
             {"older": expense_ids[0], "tie_low": expense_ids[1], "tie_high": expense_ids[2]},
         )
         connection.execute(
-            text("UPDATE expenses SET deleted_at = CURRENT_TIMESTAMP WHERE id = :id"),
+            text("UPDATE expenses SET deleted_at = CURRENT_TIMESTAMP WHERE id = CAST(:id AS UUID)"),
             {"id": expense_ids[0]},
         )
 
@@ -88,7 +88,9 @@ def test_history_returns_stored_shares_ordered_and_excludes_deleted_rows(client,
     }
     with test_engine.begin() as connection:
         for expense_id in expense_ids:
-            connection.execute(text("DELETE FROM expenses WHERE id = :id"), {"id": expense_id})
+            connection.execute(
+                text("DELETE FROM expenses WHERE id = CAST(:id AS UUID)"), {"id": expense_id}
+            )
 
 
 def test_inaccessible_group_expense_history_returns_not_found(client):
