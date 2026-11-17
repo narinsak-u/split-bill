@@ -4,10 +4,10 @@
 
 **Blocked by:** 01: Run browser tests against an isolated SplitBill stack.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Create the expense through accessible browser controls against the real API and isolated PostgreSQL 16 database.
-- [ ] Assert equal preview order and amounts: alice $3.34, bob $3.33, carol $3.33.
-- [ ] Assert expense history shows persisted shares and balances show alice +$6.66, bob -$3.33, carol -$3.33.
-- [ ] Enter exact shares that do not total the expense and assert the submit control stays disabled; make them total correctly and assert it enables.
-- [ ] Do not mock API responses or rely on arbitrary sleeps.
+- [x] Create the expense through accessible browser controls against the real API and isolated PostgreSQL 16 database.
+- [x] Assert equal preview order and amounts: alice $3.34, bob $3.33, carol $3.33.
+- [x] Assert expense history shows persisted shares and balances show alice +$6.66, bob -$3.33, carol -$3.33.
+- [x] Enter exact shares that do not total the expense and assert the submit control stays disabled; make them total correctly and assert it enables.
+- [x] Do not mock API responses or rely on arbitrary sleeps.

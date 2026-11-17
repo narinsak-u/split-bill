@@ -4,10 +4,10 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `npm run test:e2e` installs Chromium when needed, starts a distinct Compose project, waits for healthy services, and runs Playwright.
-- [ ] The project uses its own database volume and host ports; the persistent application database is never used.
-- [ ] Browser test switches users and verifies accessible groups update correctly.
-- [ ] E2E services and database volume are removed after success and test failure.
-- [ ] Browser locators are accessible and assertions wait for conditions, not fixed delays.
+- [x] `npm run test:e2e` installs Chromium when needed, starts a distinct Compose project, waits for healthy services, and runs Playwright.
+- [x] The project uses its own database volume and host ports; the persistent application database is never used.
+- [x] Browser test switches users and verifies accessible groups update correctly.
+- [x] E2E services and database volume are removed after success and test failure.
+- [x] Browser locators are accessible and assertions wait for conditions, not fixed delays.

@@ -4,9 +4,9 @@
 
 **Blocked by:** 01: Run browser tests against an isolated SplitBill stack.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Create an expense through the real browser UI and verify it appears in history with changed balances.
-- [ ] Switch to another group member who is not the payer; verify that member cannot access the delete control.
-- [ ] Switch back to the payer, delete the expense, and verify history and balances refresh.
-- [ ] Use accessible browser controls and Playwright assertions; do not mock API responses or use fixed sleeps.
+- [x] Create an expense through the real browser UI and verify it appears in history with changed balances.
+- [x] Switch to another group member who is not the payer; verify that member cannot access the delete control.
+- [x] Switch back to the payer, delete the expense, and verify history and balances refresh.
+- [x] Use accessible browser controls and Playwright assertions; do not mock API responses or use fixed sleeps.
