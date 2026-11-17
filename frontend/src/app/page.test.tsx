@@ -80,6 +80,7 @@ describe("group selection", () => {
     await screen.findByRole("option", { name: "Trip" });
     fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
     expect(await screen.findByText("Dinner")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Dinner" })).toBeInTheDocument();
     expect(screen.getByText("30.00")).toBeInTheDocument();
     expect(screen.getByText("bob: 12.34")).toBeInTheDocument();
     expect(screen.getByText("alice: 17.66")).toBeInTheDocument();
@@ -94,6 +95,87 @@ describe("group selection", () => {
     expect(await screen.findByText("No expenses recorded for this group.")).toBeInTheDocument();
     expect(screen.queryByText("Dinner")).not.toBeInTheDocument();
     expect(requests).toContainEqual({ url: expect.stringMatching(/\/groups\/1\/expenses$/), user: "bob" });
+  });
+  it("deletes payer expenses and refreshes history and balances", async () => {
+    let deleted = false;
+    let expenseRequests = 0;
+    let balanceRequests = 0;
+    const { promise, resolve } = Promise.withResolvers<Response>();
+    const requests: { url: string; init?: RequestInit }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requests.push({ url, init });
+      if (url.endsWith("/groups")) return { ok: true, json: async () => ({ groups: [{ id: 1, name: "Trip" }] }) } as Response;
+      if (url.endsWith("/groups/1")) return { ok: true, json: async () => ({ id: 1, name: "Trip", members: [{ username: "alice" }, { username: "bob" }] }) } as Response;
+      if (url.endsWith("/groups/1/expenses/7") && init?.method === "DELETE") return promise;
+      if (url.endsWith("/groups/1/expenses")) {
+        expenseRequests += 1;
+        return { ok: true, json: async () => ({ expenses: deleted ? [] : [{
+          id: "7", group_id: 1, description: "Dinner", paid_by: "alice", amount: "10.00",
+          split: { type: "equal", shares: [{ username: "alice", amount: "5.00" }, { username: "bob", amount: "5.00" }] },
+          created_at: "2025-02-03T12:30:00Z", deleted_at: null,
+        }] }) } as Response;
+      }
+      if (url.endsWith("/groups/1/balances")) {
+        balanceRequests += 1;
+        return { ok: true, json: async () => ({
+          group_id: 1,
+          total_balance: "0.00",
+          balances: [
+            { username: "alice", paid: deleted ? "0.00" : "10.00", share: deleted ? "0.00" : "5.00", balance: deleted ? "0.00" : "5.00" },
+            { username: "bob", paid: "0.00", share: deleted ? "0.00" : "5.00", balance: deleted ? "0.00" : "-5.00" },
+          ],
+        }) } as Response;
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    }));
+
+    renderPage();
+    await screen.findByRole("option", { name: "Trip" });
+    fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Delete Dinner" }));
+    expect(screen.getByRole("button", { name: "Deleting…" })).toBeDisabled();
+    expect(screen.getByText("Dinner")).toBeInTheDocument();
+    const deletion = requests.find(({ init }) => init?.method === "DELETE")!;
+    expect(deletion.url.endsWith("/groups/1/expenses/7")).toBe(true);
+    expect((deletion.init?.headers as Record<string, string>)["X-User"]).toBe("alice");
+    expect(deletion.init?.body).toBeUndefined();
+
+    deleted = true;
+    resolve({ ok: true, status: 204 } as Response);
+    expect(await screen.findByText("Expense deleted.")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(expenseRequests).toBe(2);
+      expect(balanceRequests).toBe(2);
+    });
+    expect(screen.queryByText("Dinner")).not.toBeInTheDocument();
+    expect(await screen.findByRole("listitem", { name: "alice balance: settled 0.00" })).toBeInTheDocument();
+    expect(screen.getByRole("listitem", { name: "bob balance: settled 0.00" })).toBeInTheDocument();
+  });
+  it("shows deletion failures and preserves expense history", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/groups")) return { ok: true, json: async () => ({ groups: [{ id: 1, name: "Trip" }] }) } as Response;
+      if (url.endsWith("/groups/1")) return { ok: true, json: async () => ({ id: 1, name: "Trip", members: [{ username: "alice" }] }) } as Response;
+      if (url.endsWith("/groups/1/expenses/7") && init?.method === "DELETE") {
+        return { ok: false, status: 403, json: async () => ({ error: { message: "Only the payer can delete this expense." } }) } as Response;
+      }
+      if (url.endsWith("/groups/1/expenses")) return { ok: true, json: async () => ({ expenses: [{
+        id: "7", group_id: 1, description: "Dinner", paid_by: "alice", amount: "10.00",
+        split: { type: "equal", shares: [{ username: "alice", amount: "10.00" }] },
+        created_at: "2025-02-03T12:30:00Z", deleted_at: null,
+      }] }) } as Response;
+      if (url.endsWith("/groups/1/balances")) return { ok: true, json: async () => ({ group_id: 1, balances: [], total_balance: "0.00" }) } as Response;
+      throw new Error(`Unexpected request: ${url}`);
+    }));
+
+    renderPage();
+    await screen.findByRole("option", { name: "Trip" });
+    fireEvent.change(screen.getByLabelText("Group"), { target: { value: "1" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Delete Dinner" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Only the payer can delete this expense.");
+    expect(screen.getByText("Dinner")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Dinner" })).toBeEnabled();
   });
 
   it("shows expense API errors", async () => {

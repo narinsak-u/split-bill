@@ -54,3 +54,10 @@ export async function createExpense(username: string, groupId: number, idempoten
   if (!response.ok) throw await requestError(response);
   return response.json() as Promise<Expense>;
 }
+export async function deleteExpense(username: string, groupId: number, expenseId: string): Promise<void> {
+  const response = await fetch(`${apiUrl}/groups/${groupId}/expenses/${expenseId}`, {
+    method: "DELETE",
+    headers: { "X-User": username },
+  });
+  if (!response.ok) throw await requestError(response);
+}
