@@ -24,8 +24,8 @@ Review agents and the parent inspected worktree commits before integrating them.
 - Tickets 04/05: backend pytest 53 passed; frontend Vitest 40 passed; Ruff, ESLint, and Next.js build passed. Chromium verified preview order against persisted shares and balances.
 - Ticket 06: backend pytest 56 passed; frontend Vitest 42 passed; Ruff, ESLint, and Next.js build passed. Chromium checked payer-only deletion and updated history and balances.
 
-These are recorded results from implementation phases, not checks of this documentation branch. The parent will run final checks after merge. Tool summaries did not record Ruff, ESLint, or build counts.
+These are recorded results from implementation phases, not a substitute for current checks. Final integration checks passed 56 backend and 45 frontend tests, Ruff, ESLint, and the Next.js build. A later Docker Compose smoke check covered migration, seed, expense creation through the browser, and persistence across `down`/`up`.
 
 ## Limitations
 
-The app uses `X-User` selection, not full authentication. Settlements, repayments, and Docker Compose were excluded as optional scope. The developer remains responsible for reviewing all generated code and results.
+The app uses `X-User` selection, not full authentication. Settlements and repayments remain excluded as optional scope. Docker Compose was added later for local deployment. The developer remains responsible for reviewing all generated code and results.
