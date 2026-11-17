@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getGroup, getGroups } from "../features/groups/api";
-import { getExpenses } from "../features/expenses/api";
+import { getBalances, getExpenses } from "../features/expenses/api";
 import { ExpenseForm } from "../features/expenses/ExpenseForm";
 import { ExpenseList } from "../features/expenses/ExpenseList";
+import { formatSatang, parseSatang } from "../lib/money";
 
 const users = ["alice", "bob", "carol", "dan"];
 
@@ -22,6 +23,11 @@ export default function SplitBillPage() {
   const expenses = useQuery({
     queryKey: ["expenses", username, groupId],
     queryFn: () => getExpenses(username, Number(groupId)),
+    enabled: groupId !== "",
+  });
+  const balances = useQuery({
+    queryKey: ["balances", username, groupId],
+    queryFn: () => getBalances(username, Number(groupId)),
     enabled: groupId !== "",
   });
 
@@ -67,9 +73,40 @@ export default function SplitBillPage() {
         </section>
       ) : null}
       {groupId && expenses.isPending ? <p role="status" className="mt-5">Loading expenses…</p> : null}
+      {groupId && balances.isPending ? <p role="status" className="mt-5">Loading balances…</p> : null}
+      {groupId && balances.isError ? <p role="alert" className="mt-5">Could not load balances.</p> : null}
+      {detail.data && balances.isSuccess ? (
+        <section aria-label="Group balances" className="mt-8 rounded border border-slate-200 p-5">
+          <h2 className="text-xl font-semibold">Balances</h2>
+          <ul aria-label="Group balances" className="mt-4 divide-y divide-slate-200">
+            {detail.data.members.map((member) => {
+              const balance = balances.data.balances.find((entry) => entry.username === member.username);
+              const paid = formatBalanceAmount(balance?.paid ?? "0.00");
+              const share = formatBalanceAmount(balance?.share ?? "0.00");
+              const satang = parseSatang(balance?.balance ?? "0.00");
+              if (satang === null) throw new Error("Invalid balance amount.");
+              const status = satang > 0 ? "owed" : satang < 0 ? "owes" : "settled";
+              const amount = formatSatang(Math.abs(satang));
+              const signedAmount = satang > 0 ? `+${amount}` : satang < 0 ? `-${amount}` : amount;
+              return (
+                <li key={member.username} aria-label={`${member.username} balance: ${status} ${amount}`} className="flex flex-wrap justify-between gap-2 py-3">
+                  <span className="font-medium">{member.username}</span>
+                  <span>{status === "settled" ? "Settled" : `${status === "owed" ? "Owed" : "Owes"} ${signedAmount}`}</span>
+                  <span className="w-full text-sm text-slate-600">Paid: {paid} · Share: {share}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
       {groupId && expenses.isError ? <p role="alert" className="mt-5">Could not load expenses.</p> : null}
       {groupId && expenses.isSuccess ? <ExpenseList expenses={expenses.data} /> : null}
       {detail.data && groupId ? <ExpenseForm key={`${username}-${groupId}`} username={username} groupId={Number(groupId)} members={detail.data.members.map((member) => member.username)} /> : null}
     </main>
   );
+}
+function formatBalanceAmount(value: string): string {
+  const satang = parseSatang(value);
+  if (satang === null) throw new Error("Invalid balance amount.");
+  return formatSatang(satang);
 }
