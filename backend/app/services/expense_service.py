@@ -126,7 +126,7 @@ def create_exact_expense(
             "INVALID_SPLIT_MEMBER": "Split members must be valid group members.",
             "INVALID_SPLIT_TOTAL": "The shares do not add up to the total.",
         }
-        raise _error(400, exc.code, messages[exc.code], exc.details or None) from exc
+        raise _error(422, exc.code, messages[exc.code], exc.details or None) from exc
 
 
 def _timestamp(value: datetime | None) -> str | None:
